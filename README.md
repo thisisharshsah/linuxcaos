@@ -47,7 +47,7 @@ See [the probe design](docs/ENTRY_PROBE.md) and
 
 With QEMU installed separately, `make run` launches the actual virt device model.
 Alternatively, `make console` launches the interactive serial monitor directly in your terminal using Unicorn without requiring QEMU.
-Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `fb`, `trap`, or `clear`; press `Ctrl-]` to exit the console runner.
+Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `kimage`, `fb`, `trap`, or `clear`; press `Ctrl-]` to exit the console runner.
 
 ## Independence boundary
 
@@ -75,6 +75,9 @@ research should record each specification, observation, and source explicitly.
 - `src/entry_probe.S`: stack-free, PC-relative entry-state capture experiment.
 - `tools/inspect_probe.py`: offline saved-record decoder; JSON output.
 - `tools/inspect_bootargs.py`: offline decoder for a saved candidate Apple `boot_args` capture.
+- `src/linux_boot.c`: portable Linux Image header check and kernel/DTB/initrd placement
+  per the kernel's arm64 boot rules; `make host` builds it for host tests.
+- `tools/fdt.py`: build or dump flattened device tree (DTB) files.
 - `tests/emulate_probe.py`: synthetic relocation and register-capture tests.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.

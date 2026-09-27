@@ -61,6 +61,26 @@ architecture, implementation status, and next milestones.
   instruction. It never enters the guest vector table, so exception tests model
   entry in the harness. QEMU (not installed) or hardware must test real entry.
 
+## 2026-09-27 — Linux arm64 boot contract and tooling
+
+- Source: Linux `Documentation/arch/arm64/booting.rst` from torvalds/linux,
+  latest commit touching it `2bc6b218717b9d08f466f88209251d54bc09b207`
+  (SHA-256 of fetched text `3ac50b9d3d96602fbea26bd72c81f924c81162f5330d27de6e60807fbd860a86`).
+- Used: 64-byte header layout and magic `0x644d5241`; flags bit 0 endianness,
+  bits 1–2 page size, bit 3 placement; image_size 0 means a pre-v3.17 header;
+  Image at text_offset above a 2 MB aligned base; DTB 8-byte aligned, at most
+  2 MB, not sharing a 2 MB region needing special attributes; initrd and kernel
+  inside one 1 GB aligned window of at most 32 GB; x0 = DTB, x1–x3 = 0; DAIF
+  masked; EL2 recommended, or EL1.
+- Project policy beyond the document: text_offset must be below 2 MB and 4 KB
+  aligned; pre-v3.17 and big-endian images are rejected.
+- DTB format: Devicetree Specification v0.4, section 5. A generated DTB was
+  cross-checked with the third-party `fdt` 0.3.3 Python parser, used only in a
+  throwaway environment.
+- Tool availability: no Homebrew on this Mac; conda-forge offers no macOS QEMU
+  (only `qemu-execve-*` Linux packages); the one macOS arm64 QEMU found was in a
+  personal channel and was not installed.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

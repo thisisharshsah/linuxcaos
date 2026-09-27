@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "exception.h"
 #include "framebuffer.h"
+#include "linux_boot.h"
 #include "monitor.h"
 #include "platform.h"
 
@@ -365,9 +366,50 @@ static void cmd_fb(const char *args) {
     puts_serial(" cells\n");
 }
 
+static void cmd_kimage(const char *args) {
+    static const char *const errors[] = {
+        "", "header too short", "bad magic (not an uncompressed ARM64 Image)",
+        "image_size is 0 (pre-v3.17 header; unsupported)", "big-endian kernel",
+        "reserved flag bits set", "text_offset not 4 KB aligned below 2 MB",
+        "file larger than image_size",
+    };
+    uint64_t addr = 0;
+    if (!parse_hex(&args, &addr)) {
+        puts_serial("Usage: kimage <hex_addr>\n");
+        return;
+    }
+    if (addr & 7) {
+        puts_serial("Error: address must be 8-byte aligned\n");
+        return;
+    }
+    uint8_t header[LINUX_IMAGE_HEADER_SIZE];
+    for (unsigned i = 0; i < sizeof(header); i++)
+        header[i] = *(volatile const uint8_t *)(uintptr_t)(addr + i);
+    struct linux_image_info info;
+    int err = linux_image_parse(header, sizeof(header), 0, &info);
+    if (err != LINUX_OK) {
+        puts_serial("Not a usable Linux Image: ");
+        puts_serial(errors[err]);
+        puts_serial("\n");
+        return;
+    }
+    puts_serial("ARM64 Linux Image @ 0x");
+    put_hex64(addr);
+    puts_serial("\n  text_offset: 0x");
+    put_hex64(info.text_offset);
+    puts_serial("\n  image_size:  0x");
+    put_hex64(info.image_size);
+    puts_serial("\n  page size:   ");
+    if (info.page_size_kb) { put_dec(info.page_size_kb); puts_serial(" KB"); }
+    else puts_serial("unspecified");
+    puts_serial("\n  placement:   ");
+    puts_serial(info.anywhere ? "anywhere (48-bit)" : "near DRAM start");
+    puts_serial("\n");
+}
+
 static void dispatch(void) {
     if (cmd_match(line, "help")) {
-        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  fb  trap  clear\n");
+        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  kimage  fb  trap  clear\n");
     } else if (cmd_match(line, "info")) {
         puts_serial("ARM64 / ");
         puts_serial(platform_name());
@@ -389,6 +431,8 @@ static void dispatch(void) {
         cmd_regs();
     } else if (cmd_match(line, "probe")) {
         cmd_probe(line + 5);
+    } else if (cmd_match(line, "kimage")) {
+        cmd_kimage(line + 6);
     } else if (cmd_match(line, "trap")) {
         /* Deliberate breakpoint: checks that exception vectors report and recover. */
         __asm__ volatile("brk #0x4d31");

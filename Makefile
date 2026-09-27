@@ -10,13 +10,13 @@ ifeq ($(wildcard $(PLATFORM_DIR)/platform.c),)
 $(error Unknown PLATFORM '$(PLATFORM)'; available: $(notdir $(patsubst %/,%,$(dir $(wildcard platform/*/platform.c)))))
 endif
 
-.PHONY: all probe font test run console clean
+.PHONY: all probe font host test run console clean
 all: build/monitor.bin build/entry-probe.bin
 
 probe: build/entry-probe.bin
 
-MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c $(PLATFORM_DIR)/platform.c
-MONITOR_HDR = src/exception.h src/framebuffer.h src/font.h src/monitor.h src/platform.h
+MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c src/linux_boot.c $(PLATFORM_DIR)/platform.c
+MONITOR_HDR = src/exception.h src/framebuffer.h src/font.h src/linux_boot.h src/monitor.h src/platform.h
 
 build/monitor.elf: $(MONITOR_SRC) $(MONITOR_HDR) $(PLATFORM_DIR)/link.ld
 	mkdir -p build
@@ -32,12 +32,20 @@ build/entry-probe.elf: src/entry_probe.S platform/entry-probe.ld
 build/entry-probe.bin: build/entry-probe.elf tools/elf_to_binary.py
 	$(PYTHON) tools/elf_to_binary.py --base 0 $< $@
 
+# Portable modules also built for the host, so tests exercise the same C code.
+HOST_LIB = build/host/liblinux_boot.so
+host: $(HOST_LIB)
+
+$(HOST_LIB): src/linux_boot.c src/linux_boot.h
+	mkdir -p build/host
+	$(ZIG) cc -shared -fPIC -O2 -Wall -Wextra -Werror -o $@ src/linux_boot.c
+
 # Regenerate the bitmap font header after editing tools/font8x16.txt.
 font:
 	$(PYTHON) tools/generate_font.py
 
 # The emulator tests model the qemu-virt platform only.
-test: all
+test: all host
 	$(PYTHON) tools/generate_font.py --check
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'
 	$(PYTHON) tests/emulate.py

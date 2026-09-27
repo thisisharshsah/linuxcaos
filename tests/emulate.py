@@ -276,6 +276,19 @@ for command, message in [
 ]:
     run_case(command + "\nfb\n", [message, "fb: off"])
 
+# --- Linux Image header inspection (synthetic header, not a real kernel). ---
+kernel_header = struct.pack("<IIQQQQQQII", 0x91005A4D, 0x14000000, 0, 0x1A00000, 0b1100,
+                            0, 0, 0, 0x644D5241, 0x40)
+run_case("kimage 0x40100000\n", [
+    "ARM64 Linux Image @ 0x0000000040100000", "text_offset: 0x0000000000000000",
+    "image_size:  0x0000000001a00000", "page size:   16 KB", "placement:   anywhere (48-bit)",
+], pre_write={0x40100000: kernel_header})
+run_case("kimage 0x40100000\n", ["Not a usable Linux Image: bad magic"],
+         pre_write={0x40100000: b"\x1f\x8b\x08\x00" + bytes(60)})
+run_case("kimage 0x40100000\n", ["image_size is 0"],
+         pre_write={0x40100000: kernel_header[:16] + bytes(8) + kernel_header[24:]})
+run_case("kimage 0x40100004\nkimage\n", ["8-byte aligned", "Usage: kimage"])
+
 # --- Exception vectors: report, recover, and keep working. ---
 t = run_case("regs\n", ["VBAR:      0x"])
 vbar = int(t.split("VBAR:      0x")[1][:16], 16)
@@ -317,5 +330,5 @@ run_case(f"fb 0x{FB:x} 320 64 1280\ntrap\n", ["Recovered;"], count=40_000_000,
 
 print("PASS: ARM64 startup, dirty BSS, commands, CRLF, backspace, overflow recovery, UI features "
       "(echo, clear, peek, poke, dump, regs, probe), framebuffer console (pixels, stride, scale, "
-      "wrap, scroll, clear, validation), exception report and recovery (BRK, data abort)")
+      "wrap, scroll, clear, validation), kimage header checks, exception report and recovery (BRK, data abort)")
 

@@ -50,6 +50,9 @@ cache, exception-level, and interrupt-controller requirements. Develop the
 minimum required Linux platform patches independently; track their provenance
 and licensing alongside the kernel source.
 
+Groundwork so far: portable Image header validation and load planning, and a
+DTB builder, tested on the host only (see the [blueprint](BLUEPRINT.md)).
+
 Exit criterion: Linux reaches an initramfs shell on the physical target with
 repeatable boot logs. Emulator success alone does not satisfy this milestone.
 
