@@ -17,6 +17,11 @@ are recorded in [APPLE_BOOT.md](APPLE_BOOT.md). A separate original
 harness now exist. These are preparation for physical testing, not completion
 of M1. See the [blueprint](BLUEPRINT.md) for current validation evidence.
 
+Asahi documentation (a secondary source) reports EL2 entry with the MMU off and
+`x0` = `boot_args`; the probe should confirm this. Asahi develops on hardware,
+not emulators: code is sent over USB-C from a second computer, and a second
+Apple Silicon Mac can provide the physical serial console.
+
 Record the owner-authorized custom boot process, accepted executable format,
 entry registers, exception level, memory ownership, firmware dependencies, and
 recovery procedure for MacBookPro17,1. Record observations rather than infer
@@ -53,15 +58,21 @@ and licensing alongside the kernel source.
 Groundwork so far: portable Image header validation and load planning, and a
 DTB builder, tested on the host only (see the [blueprint](BLUEPRINT.md)).
 
+The main loader work is filling the mainline device tree (memory, framebuffer,
+and other bootloader-supplied properties) from what the firmware provides. The
+kernel must be built with 16K pages.
+
 Exit criterion: Linux reaches an initramfs shell on the physical target with
 repeatable boot logs. Emulator success alone does not satisfy this milestone.
 
 ## 4 — Incremental hardware enablement
 
-Develop and validate interrupt controller, SMP, power management, IOMMU, storage,
-USB/input, networking, display/GPU, and audio support. Ordering depends on actual
-dependencies found during research. Individual subsystems can be substantial
-projects, especially firmware-mediated devices and GPU support.
+Mainline Linux already contains a MacBookPro17,1 device tree and drivers for the
+interrupt controller, UART, NVMe, PCIe, USB, IOMMU, SMC, and more (see
+[RESEARCH.md](RESEARCH.md)). First reuse and validate that support on the target;
+develop independently only what is missing or broken, and track provenance and
+licensing of any kernel patches. Firmware-mediated devices and the GPU remain
+substantial projects.
 
 Exit criterion: published per-device support matrix backed by hardware tests.
 

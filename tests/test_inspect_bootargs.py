@@ -77,10 +77,13 @@ class DecodeTests(unittest.TestCase):
         v = decode_bootargs(capture())["video"]
         self.assertEqual((v["width"], v["height"], v["row_bytes"]), (2560, 1600, 10304))
         self.assertEqual((v["depth_bits"], v["rotate"], v["scale"]), (24, 1, 2))
-        # A 24-bit depth is not the console's 32-bit format.
+        # A 24-bit depth is not a console format.
         self.assertFalse(v["matches_console_geometry"])
-        v = decode_bootargs(capture(v_depth=32))["video"]
-        self.assertTrue(v["matches_console_geometry"])
+        self.assertIsNone(v["console_format_candidate"])
+        for depth, name in ((32, "x8r8g8b8"), (30, "x2r10g10b10")):
+            v = decode_bootargs(capture(v_depth=depth))["video"]
+            self.assertTrue(v["matches_console_geometry"])
+            self.assertEqual(v["console_format_candidate"], name)
 
     def test_dark_boot_flag(self):
         self.assertTrue(decode_bootargs(capture(bootFlags=1))["dark_boot"])

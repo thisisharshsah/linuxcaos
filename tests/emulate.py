@@ -167,7 +167,16 @@ run_case(
 
 # --- Framebuffer console: compare emulator memory with an independent model. ---
 GLYPHS = parse_font((ROOT / "tools/font8x16.txt").read_text(encoding="ascii"))
-FG, BG = 0x00E0E0E0, 0x00102040
+FG_RGB, BG_RGB = 0x00E0E0E0, 0x00102040
+
+
+def encode(rgb, pixel):
+    """Independent restatement of the pixel formats (Linux simplefb layouts)."""
+    if pixel == "x8r8g8b8":
+        return rgb
+    r, g, b = (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF
+    ten = lambda c: round(c * 1023 / 255)  # full-scale mapping: 0xff -> 0x3ff
+    return (ten(r) << 20) | (ten(g) << 10) | ten(b)
 
 
 def model_cells(stream, cols, rows):
@@ -201,9 +210,10 @@ def model_cells(stream, cols, rows):
     return ["".join(r) for r in grid]
 
 
-def expected_pixels(cells, width, height, scale):
+def expected_pixels(cells, width, height, scale, pixel="x8r8g8b8"):
     """Words per pixel row; the region below the last full text row stays dirty."""
     dirty = 0x5A5A5A5A
+    FG, BG = encode(FG_RGB, pixel), encode(BG_RGB, pixel)
     out = []
     for y in range(height):
         text_row, gy = divmod(y // scale, 16)
@@ -222,8 +232,10 @@ def expected_pixels(cells, width, height, scale):
     return out, dirty
 
 
-def fb_case(width, height, stride, scale, commands, expect_lines, png=None):
+def fb_case(width, height, stride, scale, commands, expect_lines, png=None, pixel="x8r8g8b8"):
     attach = f"fb 0x{FB:x} {width} {height} {stride}" + (f" {scale}" if scale != 1 else "")
+    if pixel != "x8r8g8b8":
+        attach += f" {pixel}"
     cols, rows = width // (8 * scale), height // (16 * scale)
 
     def inspect(cpu, raw):
@@ -234,7 +246,7 @@ def fb_case(width, height, stride, scale, commands, expect_lines, png=None):
         for line in expect_lines:
             assert any(line in c for c in cells), (line, cells)
         mem = bytes(cpu.mem_read(FB, stride * height + 64))
-        want, dirty = expected_pixels(cells, width, height, scale)
+        want, dirty = expected_pixels(cells, width, height, scale, pixel)
         for y in range(height):
             got = struct.unpack_from(f"<{width}I", mem, y * stride)
             assert list(got) == want[y], f"pixel row {y} differs; cells={cells}"
@@ -242,7 +254,7 @@ def fb_case(width, height, stride, scale, commands, expect_lines, png=None):
             assert pad == b"\x5a" * len(pad), f"stride padding written in row {y}"
         assert mem[stride * height:] == b"\x5a" * 64, "write past framebuffer end"
         if png:
-            (ROOT / png).write_bytes(export(mem, width, height, stride, "png"))
+            (ROOT / png).write_bytes(export(mem, width, height, stride, "png", pixel=pixel))
 
     run_case(attach + "\n" + commands, [f"fb: attached {cols}x{rows} cells"],
              count=40_000_000, inspect=inspect)
@@ -251,11 +263,14 @@ def fb_case(width, height, stride, scale, commands, expect_lines, png=None):
 # 40x4 cells with 64 bytes of row padding: prompt, typed commands, wrap, and scroll.
 fb_case(320, 64, 1344, 1, "echo Hello M1\nhelx\bp\nfb\n",
         # The 62-character status line wraps at column 40.
-        ["> fb", "fb: 0x0000000040200000 320x64 stride 134", "4 scale 1 (40x4 cells)"],
+        ["> fb", "fb: 0x0000000040200000 320x64 stride 134", "4 scale 1 x8r8g8b8 (40x4 cell"],
         png="build/fb-test.png")
 # Scale 2 with a height that leaves a partial row, forcing repeated scrolls.
 fb_case(320, 80, 1280, 2, "echo abcdefghijklmnopqrstuvwxyz0123456789\n",
         ["uvwxyz0123456789", ">"])
+# 10-bit-per-channel format, as Apple Silicon documentation suggests (unverified here).
+fb_case(320, 64, 1280, 1, "echo ten bit\n", ["ten bit"], pixel="x2r10g10b10",
+        png="build/fb-test-x2r10g10b10.png")
 # `clear` erases the framebuffer rather than drawing the escape sequence.
 fb_case(160, 32, 640, 1, "echo gone\nclear\n", [">"])
 run_case(f"fb 0x{FB:x} 160 32 640\nfb off\nfb\necho serial only\n",
@@ -273,6 +288,8 @@ for command, message in [
     (f"fb 0x{FB:x} 320", "Usage: fb"),
     (f"fb 0x{FB:x} 320 64 1280 2 7", "Usage: fb"),
     (f"fb 0x{FB:x} 32O 64 1280", "Usage: fb"),
+    (f"fb 0x{FB:x} 320 64 1280 2 rgb565", "Usage: fb"),
+    (f"fb 0x{FB:x} 320 64 1280 x2r10g10b10 2", "Usage: fb"),
 ]:
     run_case(command + "\nfb\n", [message, "fb: off"])
 

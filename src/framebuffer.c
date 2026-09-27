@@ -8,9 +8,27 @@
  * unaligned accesses, which fault on Device memory while the MMU is off.
  */
 
+uint32_t fb_encode_color(uint32_t format, uint32_t rgb) {
+    if (format != FB_FORMAT_X2R10G10B10) return rgb & 0x00ffffffU;
+    uint32_t out = 0;
+    for (int shift = 16; shift >= 0; shift -= 8) {
+        uint32_t c = (rgb >> shift) & 0xff;
+        /* Replicate the top bits so 0xff maps to 0x3ff and 0x00 to 0. */
+        out = (out << 10) | (c << 2) | (c >> 6);
+    }
+    return out;
+}
+
+const char *fb_format_name(uint32_t format) {
+    if (format == FB_FORMAT_X8R8G8B8) return "x8r8g8b8";
+    if (format == FB_FORMAT_X2R10G10B10) return "x2r10g10b10";
+    return 0;
+}
+
 int fb_console_init(struct fb_console *fb, uint64_t base, uint32_t width,
                     uint32_t height, uint32_t stride, uint32_t scale,
-                    uint32_t fg, uint32_t bg) {
+                    uint32_t format, uint32_t fg_rgb, uint32_t bg_rgb) {
+    if (!fb_format_name(format)) return FB_ERR_FORMAT;
     if ((base & 3) || (stride & 3)) return FB_ERR_ALIGN;
     if (scale < FB_MIN_SCALE || scale > FB_MAX_SCALE) return FB_ERR_SCALE;
     if (width == 0 || height == 0 || width > FB_MAX_DIMENSION || height > FB_MAX_DIMENSION)
@@ -29,8 +47,9 @@ int fb_console_init(struct fb_console *fb, uint64_t base, uint32_t width,
     fb->rows = height / (FONT_HEIGHT * scale);
     fb->col = 0;
     fb->row = 0;
-    fb->fg = fg;
-    fb->bg = bg;
+    fb->fg = fb_encode_color(format, fg_rgb);
+    fb->bg = fb_encode_color(format, bg_rgb);
+    fb->format = format;
     return FB_OK;
 }
 

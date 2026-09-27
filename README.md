@@ -58,8 +58,11 @@ mean building a different operating system. No Linux source is included yet.
 Existing Apple firmware is also outside this project's implementation scope.
 
 This is independently authored code, not a claim of legally audited clean-room
-development. Prior project discussion referenced Asahi documentation; future
-research should record each specification, observation, and source explicitly.
+development. At the project owner's request, Asahi Linux's public
+documentation (not its code) has been consulted; sources are pinned in
+[docs/RESEARCH.md](docs/RESEARCH.md). Mainline Linux already includes device
+trees and drivers for this Mac, which this project intends to reuse rather than
+rewrite. Record each specification, observation, and source explicitly.
 
 ## Files
 

@@ -115,10 +115,23 @@ work. A physical pass requires a repeatable observable result from our code on
 the target Mac and a saved capture. Host tests, Unicorn instruction tests, and
 QEMU device-model tests cannot satisfy that gate.
 
+## Secondary-source findings (Asahi documentation, 2026-09-27)
+
+At the project owner's request, Asahi Linux's public documentation was read
+(not its code); sources and details are in [RESEARCH.md](RESEARCH.md). It
+reports that iBoot enters a custom payload **at EL2 with the MMU off and `x0`
+pointing to `boot_args`**, consistent with the hypothesis above; that RAM starts
+at physical `0x8_0000_0000`; that flat ARM64 images are accepted since macOS
+12.1; and that iBoot locks the boot CPU's reset vector (RVBAR) to the top of the
+entry page, so that page must be treated as resident code. These are documented
+claims from a third party, not our measurements, and they refine rather than
+replace the experiment plan: the probe should confirm them on this Mac.
+
 ## Research provenance
 
-This investigation used Apple's security documentation, the two pinned Apple
-XNU files linked above, and installed Apple command help. No Asahi, m1n1, or
-U-Boot implementation was consulted or incorporated for this work. Reading
+The original investigation used Apple's security documentation, the two pinned
+Apple XNU files linked above, and installed Apple command help. No Asahi, m1n1,
+or U-Boot implementation was consulted or incorporated for this work. Asahi
+documentation (not code) was consulted afterwards, as recorded above. Reading
 Apple's public definitions for interface research does not itself constitute an
 audited clean-room process. No Apple source is vendored by this document.

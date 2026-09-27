@@ -48,6 +48,14 @@ class DecodeTests(unittest.TestCase):
         # The top byte (X) is ignored; padding bytes never appear.
         self.assertEqual(rgb, bytes.fromhex("112233 445566 aabbcc 000000".replace(" ", "")))
 
+    def test_x2r10g10b10(self):
+        # R=0x3ff, G=0x200, B=0x001 -> top 8 bits 0xff, 0x80, 0x00.
+        word = (0x3FF << 20) | (0x200 << 10) | 0x001
+        self.assertEqual(decode_xrgb8888(pixels([word]), 1, 1, 4, pixel="x2r10g10b10"),
+                         b"\xff\x80\x00")
+        with self.assertRaises(ValueError):
+            decode_xrgb8888(pixels([0]), 1, 1, 4, pixel="rgb565")
+
     def test_offset(self):
         dump = b"\x00" * 4 + pixels([0x00010203])
         self.assertEqual(decode_xrgb8888(dump, 1, 1, 4, offset=4), b"\x01\x02\x03")

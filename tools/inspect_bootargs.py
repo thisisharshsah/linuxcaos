@@ -94,9 +94,11 @@ def decode_bootargs(data: bytes) -> dict:
             "depth_bits": depth_bits,
             "rotate": rotate,
             "scale": scale,
-            # Our text console writes 32-bit pixels; the channel order is still unknown.
+            # Documentation-derived guess (see docs/RESEARCH.md), never a measurement:
+            # depth 30 -> x2r10g10b10, depth 32 -> x8r8g8b8, both in 32-bit words.
+            "console_format_candidate": {30: "x2r10g10b10", 32: "x8r8g8b8"}.get(depth_bits),
             "matches_console_geometry": bool(
-                v_base and depth_bits == 32 and v_width and v_height
+                v_base and depth_bits in (30, 32) and v_width and v_height
                 and v_row_bytes >= v_width * 4 and v_row_bytes % 4 == 0 and v_base % 4 == 0),
         },
         "machine_type": _hex(machine_type),

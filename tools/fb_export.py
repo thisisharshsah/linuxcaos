@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Convert a saved 32-bit framebuffer dump into a PNG or PPM image.
 
-Reads only files. Each pixel is assumed to be a little-endian 0x00RRGGBB word,
-the format written by src/framebuffer.c. That is a project convention, not an
-observed Apple display format; a dump in another format will export incorrectly.
+Reads only files. Each pixel is a little-endian 32-bit word in one of the
+formats src/framebuffer.c writes (Linux simple-framebuffer names): x8r8g8b8
+(default) or x2r10g10b10. Neither is an observed Apple display format; a dump in
+another format will export incorrectly.
 """
 
 import argparse
@@ -13,8 +14,21 @@ import zlib
 from pathlib import Path
 
 
-def decode_xrgb8888(data: bytes, width: int, height: int, stride: int, offset: int = 0) -> bytes:
+PIXEL_FORMATS = ("x8r8g8b8", "x2r10g10b10")
+
+
+def _rgb(word: int, pixel: str) -> bytes:
+    if pixel == "x2r10g10b10":
+        # Keep the top 8 of each 10-bit channel.
+        return bytes(((word >> 22) & 0xFF, (word >> 12) & 0xFF, (word >> 2) & 0xFF))
+    return bytes(((word >> 16) & 0xFF, (word >> 8) & 0xFF, word & 0xFF))
+
+
+def decode_xrgb8888(data: bytes, width: int, height: int, stride: int, offset: int = 0,
+                    pixel: str = "x8r8g8b8") -> bytes:
     """Return packed RGB888 rows, discarding row padding beyond width * 4 bytes."""
+    if pixel not in PIXEL_FORMATS:
+        raise ValueError(f"unsupported pixel format: {pixel}")
     if width <= 0 or height <= 0:
         raise ValueError("width and height must be positive")
     if stride < width * 4:
@@ -29,8 +43,8 @@ def decode_xrgb8888(data: bytes, width: int, height: int, stride: int, offset: i
     for y in range(height):
         row = offset + y * stride
         for x in range(width):
-            b, g, r, _ = data[row + x * 4: row + x * 4 + 4]
-            out[o:o + 3] = bytes((r, g, b))
+            word = int.from_bytes(data[row + x * 4: row + x * 4 + 4], "little")
+            out[o:o + 3] = _rgb(word, pixel)
             o += 3
     return bytes(out)
 
@@ -55,8 +69,9 @@ def encode_ppm(rgb: bytes, width: int, height: int) -> bytes:
     return f"P6\n{width} {height}\n255\n".encode("ascii") + rgb
 
 
-def export(data: bytes, width: int, height: int, stride: int, fmt: str, offset: int = 0) -> bytes:
-    rgb = decode_xrgb8888(data, width, height, stride, offset)
+def export(data: bytes, width: int, height: int, stride: int, fmt: str, offset: int = 0,
+           pixel: str = "x8r8g8b8") -> bytes:
+    rgb = decode_xrgb8888(data, width, height, stride, offset, pixel)
     if fmt == "png":
         return encode_png(rgb, width, height)
     if fmt == "ppm":
@@ -73,11 +88,14 @@ def main(argv=None) -> int:
     parser.add_argument("--stride", type=int, help="bytes per row (default: width * 4)")
     parser.add_argument("--offset", type=int, default=0, help="byte offset of the first pixel")
     parser.add_argument("--format", choices=("png", "ppm"), help="default: from output suffix")
+    parser.add_argument("--pixel", choices=PIXEL_FORMATS, default="x8r8g8b8",
+                        help="pixel format of the dump (default: x8r8g8b8)")
     args = parser.parse_args(argv)
     fmt = args.format or args.output.suffix.lstrip(".").lower()
     stride = args.stride if args.stride is not None else args.width * 4
     try:
-        image = export(args.dump.read_bytes(), args.width, args.height, stride, fmt, args.offset)
+        image = export(args.dump.read_bytes(), args.width, args.height, stride, fmt, args.offset,
+                       args.pixel)
     except (OSError, ValueError) as exc:
         print(f"fb_export: {exc}", file=sys.stderr)
         return 1

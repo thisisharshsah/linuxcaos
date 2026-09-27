@@ -320,6 +320,8 @@ static void cmd_fb(const char *args) {
         put_dec(fb.stride);
         puts_serial(" scale ");
         put_dec(fb.scale);
+        puts_serial(" ");
+        puts_serial(fb_format_name(fb.format));
         puts_serial(" (");
         put_dec(fb.cols);
         puts_serial("x");
@@ -333,10 +335,18 @@ static void cmd_fb(const char *args) {
         return;
     }
     uint64_t addr, width, height, stride, scale = 1;
-    if (!parse_hex(&p, &addr) || !parse_dec(&p, &width) || !parse_dec(&p, &height) ||
-        !parse_dec(&p, &stride) || (*skip_spaces(p) && !parse_dec(&p, &scale)) ||
-        *skip_spaces(p)) {
-        puts_serial("Usage: fb <hex_addr> <width> <height> <stride_bytes> [scale] | fb off\n");
+    uint32_t format = FB_FORMAT_X8R8G8B8;
+    int ok = parse_hex(&p, &addr) && parse_dec(&p, &width) && parse_dec(&p, &height) &&
+             parse_dec(&p, &stride);
+    if (ok && *skip_spaces(p) >= '0' && *skip_spaces(p) <= '9') ok = parse_dec(&p, &scale);
+    if (ok && *skip_spaces(p)) {
+        p = skip_spaces(p);
+        if (cmd_match(p, "x8r8g8b8")) { format = FB_FORMAT_X8R8G8B8; p += 8; }
+        else if (cmd_match(p, "x2r10g10b10")) { format = FB_FORMAT_X2R10G10B10; p += 11; }
+        else ok = 0;
+    }
+    if (!ok || *skip_spaces(p)) {
+        puts_serial("Usage: fb <hex_addr> <width> <height> <stride_bytes> [scale] [x8r8g8b8|x2r10g10b10] | fb off\n");
         return;
     }
     if (width > UINT32_MAX || height > UINT32_MAX || stride > UINT32_MAX || scale > UINT32_MAX) {
@@ -345,7 +355,7 @@ static void cmd_fb(const char *args) {
     }
     struct fb_console next;
     int err = fb_console_init(&next, addr, (uint32_t)width, (uint32_t)height,
-                              (uint32_t)stride, (uint32_t)scale, 0x00e0e0e0U, 0x00102040U);
+                              (uint32_t)stride, (uint32_t)scale, format, 0x00e0e0e0U, 0x00102040U);
     if (err == FB_ERR_ALIGN) { puts_serial("Error: framebuffer address and stride must be 4-byte aligned\n"); return; }
     if (err == FB_ERR_SCALE) { puts_serial("Error: framebuffer scale must be 1-8\n"); return; }
     if (err == FB_ERR_STRIDE) { puts_serial("Error: framebuffer stride must be >= width*4\n"); return; }

@@ -30,8 +30,10 @@ on Linux and macOS.
   [Developer Certificate of Origin](https://developercertificate.org/): you have
   the right to submit the code under the project license.
 - **Write it yourself.** Do not copy code from other Apple Silicon boot projects
-  or from proprietary sources. You may learn from public documentation. Record
-  what you relied on in [docs/RESEARCH.md](docs/RESEARCH.md) with links.
+  (such as m1n1 or U-Boot) or from proprietary sources. Public documentation,
+  including Asahi Linux's, may be read and cited. Mainline Linux is reused as
+  the kernel. Record what you relied on in [docs/RESEARCH.md](docs/RESEARCH.md)
+  with links.
 - **Say exactly what you proved.** Use the blueprint's evidence levels: build
   passed, host tests, Unicorn instruction tests, QEMU device tests, or
   physical-M1 validation. Never describe emulator success as hardware support,
