@@ -46,6 +46,21 @@ architecture, implementation status, and next milestones.
   image should still record its actual entry address. Synthetic tests cover
   these conditions but cannot establish what Apple's firmware supplies.
 
+## 2026-09-27 — boot_args header re-check and exception handling
+
+- Source: Apple XNU `pexpert/pexpert/arm64/boot.h` at the pinned commit
+  `e890dd3c5b68b2b8f7c726c8812e74cc347cb0ba`, fetched as raw text (SHA-256
+  `b963e576533b8ee06b981ab6432c1d8d1d5f11a5c320ecfbc26b43012c7bd30c`).
+- Confirmed: every field offset in [APPLE_BOOT.md](APPLE_BOOT.md); revision
+  constants 1 and 2 (2 adds `bootFlags`); version constants 1 and 2; dark-boot
+  flag bit 0; `v_depth` packing (depth bits 0–7, rotate from bit 8, scale from 16).
+- Not established: that current firmware uses this layout, that our payload
+  receives it, or the framebuffer's pixel channel order and writeability.
+- Tool observation: Unicorn 2.1.4 stops with `UC_ERR_EXCEPTION` on BRK/SVC/UDF
+  and with unmapped-access errors on aborts, leaving PC at the faulting
+  instruction. It never enters the guest vector table, so exception tests model
+  entry in the harness. QEMU (not installed) or hardware must test real entry.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

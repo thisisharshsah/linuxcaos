@@ -34,8 +34,9 @@ validated console/framebuffer path, exception vectors, timer, memory map,
 and cache/MMU rules. Each finding needs hardware, firmware version, evidence,
 and a reproduction procedure in the research log.
 
-Preparation so far: a platform-neutral framebuffer text console, tested only
-against emulator memory (see the [blueprint](BLUEPRINT.md)). Using it on the M1
+Preparation so far: exception vectors with crash reports, a platform-neutral
+framebuffer text console, and an offline `boot_args` decoder, tested only in
+emulators and host tests (see the [blueprint](BLUEPRINT.md)). Using it on the M1
 requires a sourced or measured framebuffer description first.
 
 Exit criterion: stable diagnostic output and captured exception reports across

@@ -15,8 +15,8 @@ all: build/monitor.bin build/entry-probe.bin
 
 probe: build/entry-probe.bin
 
-MONITOR_SRC = src/start.S src/monitor.c src/framebuffer.c $(PLATFORM_DIR)/platform.c
-MONITOR_HDR = src/framebuffer.h src/font.h src/platform.h
+MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c $(PLATFORM_DIR)/platform.c
+MONITOR_HDR = src/exception.h src/framebuffer.h src/font.h src/monitor.h src/platform.h
 
 build/monitor.elf: $(MONITOR_SRC) $(MONITOR_HDR) $(PLATFORM_DIR)/link.ld
 	mkdir -p build

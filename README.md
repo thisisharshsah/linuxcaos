@@ -47,7 +47,7 @@ See [the probe design](docs/ENTRY_PROBE.md) and
 
 With QEMU installed separately, `make run` launches the actual virt device model.
 Alternatively, `make console` launches the interactive serial monitor directly in your terminal using Unicorn without requiring QEMU.
-Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `fb`, or `clear`; press `Ctrl-]` to exit the console runner.
+Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `fb`, `trap`, or `clear`; press `Ctrl-]` to exit the console runner.
 
 ## Independence boundary
 
@@ -63,7 +63,8 @@ research should record each specification, observation, and source explicitly.
 
 ## Files
 
-- `src/start.S`: interrupt masking, stack setup, BSS clearing, C entry.
+- `src/start.S`: interrupt masking, stack setup, BSS clearing, vector install, C entry.
+- `src/vectors.S`, `src/exception.c`: exception vectors; crash report, then return to the prompt.
 - `src/monitor.c`: portable polling monitor; no runtime or standard library.
 - `src/platform.h`: board-support interface; each board lives in `platform/<name>/`
   and is chosen with `make PLATFORM=<name>` ([how to add one](platform/README.md)).
@@ -73,13 +74,15 @@ research should record each specification, observation, and source explicitly.
 - `tools/fb_export.py`: converts a saved framebuffer dump to PNG/PPM.
 - `src/entry_probe.S`: stack-free, PC-relative entry-state capture experiment.
 - `tools/inspect_probe.py`: offline saved-record decoder; JSON output.
+- `tools/inspect_bootargs.py`: offline decoder for a saved candidate Apple `boot_args` capture.
 - `tests/emulate_probe.py`: synthetic relocation and register-capture tests.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.
 - `docs/ROADMAP.md`: hardware milestones and completion criteria.
 
 The monitor binary expects one CPU, MMU off, and accessible QEMU virt RAM/UART. Interrupts
-stay masked. There is no exception vector table, allocator, device-tree parser,
+stay masked. CPU exceptions print a register report and return to the prompt
+(`trap` triggers one deliberately). There is no interrupt handling, allocator, device-tree parser,
 Linux loader, persistent storage, or Apple hardware driver.
 
 `fb <hex_addr> <width> <height> <stride_bytes> [scale]` mirrors console output to

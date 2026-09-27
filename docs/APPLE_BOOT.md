@@ -69,10 +69,15 @@ that header; they are not a captured firmware structure or a universal format.
 | `0x06c` | `CommandLine` | 608 |
 | `0x2d0`, `0x2d8` | `bootFlags`, `memSizeActual` | 8 each |
 
-Derived total size: `0x2e0` (736 bytes), including alignment padding. A follow-on
-host decoder should initially accept only a bounded byte capture, expose its
-revision/version, and reject truncated or unsupported layouts. It must never
-read a live pointer supplied in a capture. Pointer-bearing fields are evidence
+Derived total size: `0x2e0` (736 bytes), including alignment padding. The same
+header defines revision constants 1 and 2 (revision 2 adds `bootFlags`), version
+constants 1 and 2, bit 0 of `bootFlags` as dark boot, and packs `v_depth` as
+pixel depth in bits 0–7, rotation from bit 8, and scale from bit 16.
+
+[inspect_bootargs.py](../tools/inspect_bootargs.py) implements this as an offline
+decoder: it accepts only a bounded byte capture, exposes revision/version,
+rejects truncated or unsupported layouts, and never reads a live pointer
+supplied in a capture. Pointer-bearing fields are evidence
 to investigate, not proof that those addresses are valid or safe to access.
 Neither the device-tree encoding nor framebuffer writeability is established by
 this field list.

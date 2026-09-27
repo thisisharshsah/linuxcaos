@@ -2,7 +2,9 @@
 /* Portable monitor: all device access goes through platform.h. */
 #include <stdint.h>
 #include <stddef.h>
+#include "exception.h"
 #include "framebuffer.h"
+#include "monitor.h"
 #include "platform.h"
 
 static char line[80];
@@ -213,6 +215,7 @@ static inline uint64_t read_sp(void) {
 
 static void cmd_regs(void) {
     uint64_t el = read_current_el();
+    uint64_t vbar = exception_vbar();
     uint64_t daif = read_daif();
     uint64_t sp = read_sp();
 
@@ -232,6 +235,8 @@ static void cmd_regs(void) {
     putch((daif & (1ULL << 6)) ? '1' : '0');
     puts_serial("]\nSP:        0x");
     put_hex64(sp);
+    puts_serial("\nVBAR:      0x");
+    put_hex64(vbar);
     puts_serial("\n");
 }
 
@@ -362,13 +367,16 @@ static void cmd_fb(const char *args) {
 
 static void dispatch(void) {
     if (cmd_match(line, "help")) {
-        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  fb  clear\n");
+        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  fb  trap  clear\n");
     } else if (cmd_match(line, "info")) {
         puts_serial("ARM64 / ");
         puts_serial(platform_name());
         puts_serial(" / single CPU / MMU off\n");
     } else if (cmd_match(line, "status")) {
         puts_serial("Independent monitor. Apple boot: unimplemented. Linux handoff: unimplemented.\n");
+        puts_serial("Exceptions recovered: ");
+        put_dec(exception_count());
+        puts_serial("\n");
     } else if (cmd_match(line, "echo")) {
         cmd_echo(line + 4);
     } else if (cmd_match(line, "dump")) {
@@ -381,6 +389,9 @@ static void dispatch(void) {
         cmd_regs();
     } else if (cmd_match(line, "probe")) {
         cmd_probe(line + 5);
+    } else if (cmd_match(line, "trap")) {
+        /* Deliberate breakpoint: checks that exception vectors report and recover. */
+        __asm__ volatile("brk #0x4d31");
     } else if (cmd_match(line, "fb")) {
         cmd_fb(line + 2);
     } else if (cmd_match(line, "clear")) {
@@ -392,13 +403,11 @@ static void dispatch(void) {
     }
 }
 
-void monitor_main(void) {
-    platform_console_init();
-    if (bss_probe != 0) {
-        puts_serial("FAIL: BSS not cleared\n");
-        for (;;) {}
-    }
-    puts_serial("Independent ARM64 monitor v0.1\nBSS cleared; serial ready.\n> ");
+void console_putc(char c) { putch(c); }
+void console_puts(const char *s) { puts_serial(s); }
+void console_put_hex64(uint64_t val) { put_hex64(val); }
+
+static void __attribute__((noreturn)) command_loop(void) {
     size_t used = 0;
     int overflow = 0;
     int previous_cr = 0;
@@ -423,3 +432,17 @@ void monitor_main(void) {
     }
 }
 
+void monitor_resume(void) {
+    puts_serial("> ");
+    command_loop();
+}
+
+void monitor_main(void) {
+    platform_console_init();
+    if (bss_probe != 0) {
+        puts_serial("FAIL: BSS not cleared\n");
+        for (;;) {}
+    }
+    puts_serial("Independent ARM64 monitor v0.1\nBSS cleared; serial ready.\n> ");
+    command_loop();
+}
