@@ -73,7 +73,8 @@ def run_case(commands, expected, pre_write=None, count=200000, inspect=None):
     def read(uc, access, address, size, value, data):
         if address == UART + 0x18:
             uc.mem_write(address, (0 if incoming else 0x10).to_bytes(4, "little"))
-            if not incoming and outgoing.endswith(b"> "):
+            # The prompt starts a line; "> " inside text (e.g. "<image> ") is not a prompt.
+            if not incoming and outgoing.endswith(b"\n> "):
                 uc.emu_stop()
         elif address == UART:
             uc.mem_write(address, incoming.popleft().to_bytes(4, "little"))
@@ -251,6 +252,30 @@ run_case("kimage 0x40100000\n", ["Not a usable Linux Image: bad magic"],
 run_case("kimage 0x40100000\n", ["image_size is 0"],
          pre_write={0x40100000: kernel_header[:16] + bytes(8) + kernel_header[24:]})
 run_case("kimage 0x40100004\nkimage\n", ["8-byte aligned", "Usage: kimage"])
+
+# --- boot: refusals are checked before anything is copied (no kernel runs here). ---
+from tools.fdt import Node as DtNode, build_dtb as dt_build, string as dt_str, u32 as dt_u32
+
+
+def boot_dtb(ram_size):
+    return dt_build(DtNode("", {"#address-cells": dt_u32(2), "#size-cells": dt_u32(2)}, [
+        DtNode("memory@40000000", {"device_type": dt_str("memory"),
+                                   "reg": dt_u32(0, 0x40000000, 0, ram_size)})]))
+
+
+small_header = struct.pack("<IIQQQQQQII", 0, 0, 0, 0x100000, 0b1010, 0, 0, 0, 0x644D5241, 0)
+run_case("boot\n", ["Usage: boot <image> <image_bytes> <dtb> <initrd> <initrd_bytes> (hex)"])
+run_case("boot 40100000 1000 40180000 40190000 100\n", ["Error: not a usable Linux Image"])
+run_case("boot 40100000 1000 40180000 40190000 100\n", ["Error: invalid device tree"],
+         pre_write={0x40100000: small_header})
+run_case("boot 40100000 1000 40180000 40190000 100\n", ["Error: kernel, DTB, and initrd do not fit in RAM"],
+         pre_write={0x40100000: small_header, 0x40180000: boot_dtb(0x280000)})
+# A 2 MiB staged file (header image_size 3 MiB) at 0x40100000 reaches into the planned
+# kernel slot at 0x40200000, so the loader must refuse before copying.
+big_header = struct.pack("<IIQQQQQQII", 0, 0, 0, 0x300000, 0b1010, 0, 0, 0, 0x644D5241, 0)
+run_case("boot 40100000 200000 40180000 40190000 100\n", ["Error: staged files overlap the planned layout"],
+         pre_write={0x40100000: big_header, 0x40180000: boot_dtb(0x10000000)})
+run_case("boot 40100004 1000 40180000 40190000 100\n", ["Error: addresses must be 8-byte aligned"])
 
 # --- Exception vectors: report, recover, and keep working. ---
 t = run_case("regs\n", ["VBAR:      0x"])

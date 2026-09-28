@@ -58,8 +58,11 @@ cache, exception-level, and interrupt-controller requirements. Develop the
 minimum required Linux platform patches independently; track their provenance
 and licensing alongside the kernel source.
 
-Groundwork so far: portable Image header validation and load planning, and a
-DTB builder, tested on the host only (see the [blueprint](BLUEPRINT.md)).
+Groundwork so far: the monitor's `boot` loader boots a real Linux kernel to an
+initramfs userspace in a Hypervisor.framework VM on this Mac's cores
+(`make linux-vm-test`, generic 4K-page kernel, EL1). The remaining M3 work is the
+physical path: EL2 entry from iBoot, the real memory map and device tree, a
+16K-page kernel, and the Apple-specific boot stage (see the [blueprint](BLUEPRINT.md)).
 
 The main loader work is filling the mainline device tree (memory, framebuffer,
 and other bootloader-supplied properties) from what the firmware provides. The

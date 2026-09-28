@@ -58,6 +58,11 @@ and screen probe run on the real CPU cores in a small Hypervisor.framework VM
 (EL1, MMU off). This catches bugs Unicorn cannot, such as trapped FP/SIMD
 instructions. It is not an M1 boot: no EL2, iBoot, or Apple devices.
 
+`make linux-vm-test` goes further: the monitor's own `boot` loader starts a real
+Linux kernel (Debian's arm64 build, fetched once and checksum-verified) in that
+VM, which runs a tiny initramfs userspace and powers off. This tests the loader
+against real Linux on real cores; it is still not an M1 hardware boot.
+
 With QEMU installed separately, `make run` launches the actual virt device model.
 Alternatively, `make console` launches the interactive serial monitor directly in your terminal using Unicorn without requiring QEMU.
 Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `kimage`, `fb`, `trap`, or `clear`; press `Ctrl-]` to exit the console runner.
@@ -98,7 +103,9 @@ rewrite. Record each specification, observation, and source explicitly.
 - `tools/fdt.py`: build or dump flattened device tree (DTB) files.
 - `src/fdt.c`: freestanding DTB editor and Linux device-tree fill-in for the loader.
 - `tools/fetch_upstream_dt.py`: `make upstream-dt` fetches and builds the real mainline MacBookPro17,1 DTB (pinned, checksummed) for tests.
-- `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
+- `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests (GICv3, PSCI).
+- `src/linux_jump.S`, monitor `boot`: the Linux handoff.
+- `tools/vm/`: tiny `init`, initramfs packer, VM device tree, and kernel fetch for `make linux-vm-test`.
 - `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
 - `tools/make_hw_kit.py`: assembles the owner's hardware-run kit (`make hw-kit`).
 - `tools/probeos.sh`, `tools/probeos-recovery.sh`: guided setup and complete removal of ProbeOS.

@@ -19,14 +19,19 @@
  *   --dump ADDR:SIZE:FILE  write guest memory to FILE when the run stops
  *   --max-exits N          stop after N VM exits (default 50000000)
  *   --timeout SECONDS      wall-clock limit (default 30)
+ *   --gic DIST:REDIST      create an in-kernel GICv3 (macOS 15+) at these guest
+ *                          addresses; also enables PSCI over HVC/SMC (VERSION,
+ *                          FEATURES, SYSTEM_OFF, SYSTEM_RESET) for Linux guests
+ *   --gic-info             print GIC sizes/alignments and exit
  *
  * WFE does not necessarily exit to the host, so a watchdog thread interrupts
  * the vCPU every 20 ms; a vCPU found at a WFE instruction counts as parked.
  *
  * Guest UART output goes to stdout. The final status line on stderr is one of
- * "[stop: idle]" (input consumed, output ends with "> "), "[stop: parked]"
- * (guest waiting in WFE/WFI), "[stop: limit]", "[stop: timeout]", or
- * "[stop: fault ...]". Exit status: 0 idle/parked, 3 otherwise, 2 setup error.
+ * "[stop: idle]" (input consumed, output ends with "\n> "), "[stop: parked]"
+ * (guest waiting in WFE/WFI), "[stop: poweroff]" / "[stop: reset]" (PSCI),
+ * "[stop: limit]", "[stop: timeout]", or "[stop: fault ...]".
+ * Exit status: 0 idle/parked/poweroff/reset, 3 otherwise, 2 setup error.
  */
 #include <Hypervisor/Hypervisor.h>
 #include <pthread.h>
@@ -90,12 +95,25 @@ int main(int argc, char **argv) {
     int ndumps = 0;
     const char *input = "";
     uint64_t entry = 0, pstate = 0x3c5, uart = 0, max_exits = 50000000, timeout = 30;
-    int have_uart = 0, fill = 0;
+    int have_uart = 0, fill = 0, have_gic = 0;
+    uint64_t gic_dist = 0, gic_redist = 0;
     uint64_t regs[31] = {0}, sp = 0;
     int reg_set[31] = {0}, sp_set = 0;
     struct { const char *file; uint64_t addr; } loads[MAX_MAPS];
     int nloads = 0;
 
+    if (argc == 2 && !strcmp(argv[1], "--gic-info")) {
+        size_t ds = 0, da = 0, rs = 0, rr = 0, ra = 0;
+        uint32_t spi_base = 0, spi_count = 0;
+        if (hv_gic_get_distributor_size(&ds) || hv_gic_get_distributor_base_alignment(&da) ||
+            hv_gic_get_redistributor_size(&rs) || hv_gic_get_redistributor_region_size(&rr) ||
+            hv_gic_get_redistributor_base_alignment(&ra) || hv_gic_get_spi_interrupt_range(&spi_base, &spi_count))
+            return fail("GIC parameters unavailable (needs macOS 15 or later)", NULL);
+        printf("distributor_size=0x%zx distributor_align=0x%zx redistributor_size=0x%zx "
+               "redistributor_region_size=0x%zx redistributor_align=0x%zx spi_base=%u spi_count=%u\n",
+               ds, da, rs, rr, ra, spi_base, spi_count);
+        return 0;
+    }
     for (int i = 1; i < argc; i++) {
         const char *opt = argv[i], *val = i + 1 < argc ? argv[i + 1] : NULL;
         if (!val) return fail("missing value for", opt);
@@ -143,6 +161,12 @@ int main(int argc, char **argv) {
             max_exits = num(val);
         } else if (!strcmp(opt, "--timeout")) {
             timeout = num(val);
+        } else if (!strcmp(opt, "--gic")) {
+            char *colon = strchr(val, ':');
+            if (!colon) return fail("--gic needs DIST:REDIST", val);
+            gic_dist = num(val);
+            gic_redist = num(colon + 1);
+            have_gic = 1;
         } else {
             return fail("unknown option", opt);
         }
@@ -173,11 +197,20 @@ int main(int argc, char **argv) {
         if (hv_vm_map(maps[i].host, maps[i].addr, maps[i].size,
                       HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC) != HV_SUCCESS)
             return fail("hv_vm_map failed", NULL);
+    if (have_gic) { /* must precede vCPU creation */
+        hv_gic_config_t gic = hv_gic_config_create();
+        if (hv_gic_config_set_distributor_base(gic, gic_dist) != HV_SUCCESS ||
+            hv_gic_config_set_redistributor_base(gic, gic_redist) != HV_SUCCESS ||
+            hv_gic_create(gic) != HV_SUCCESS)
+            return fail("hv_gic_create failed (check alignment with --gic-info)", NULL);
+    }
 
     hv_vcpu_t vcpu;
     hv_vcpu_exit_t *exit_info;
     if (hv_vcpu_create(&vcpu, &exit_info, NULL) != HV_SUCCESS) return fail("hv_vcpu_create failed", NULL);
     hv_vcpu_set_trap_debug_exceptions(vcpu, false); /* BRK goes to the guest's own vectors */
+    if (have_gic) /* GICv3 routes by affinity: this vCPU is Aff0 = 0 (bit 31 is RES1) */
+        hv_vcpu_set_sys_reg(vcpu, HV_SYS_REG_MPIDR_EL1, 0x80000000ULL);
     hv_vcpu_set_reg(vcpu, HV_REG_PC, entry);
     hv_vcpu_set_reg(vcpu, HV_REG_CPSR, pstate);
     for (int n = 0; n < 31; n++)
@@ -189,10 +222,11 @@ int main(int argc, char **argv) {
     pthread_create(&watcher, NULL, watchdog, NULL);
     time_t deadline = time(NULL) + (time_t)timeout;
     size_t in_pos = 0, in_len = strlen(input);
-    char tail[2] = {0, 0};
+    char tail[3] = {0, 0, 0};
     const char *stop = "limit";
     int status = 3;
     char fault[160] = "";
+    uint64_t psci_calls = 0, sysreg_traps = 0;
 
     for (uint64_t exits = 0; exits < max_exits; exits++) {
         if (hv_vcpu_run(vcpu) != HV_SUCCESS) { stop = "fault"; snprintf(fault, sizeof fault, " hv_vcpu_run failed"); break; }
@@ -203,10 +237,44 @@ int main(int argc, char **argv) {
             if (time(NULL) > deadline) { stop = "timeout"; break; }
             continue;
         }
+        if (exit_info->reason == HV_EXIT_REASON_VTIMER_ACTIVATED) {
+            hv_vcpu_set_vtimer_mask(vcpu, false); /* the in-kernel GIC delivers it */
+            continue;
+        }
         if (exit_info->reason != HV_EXIT_REASON_EXCEPTION) continue;
         uint64_t esr = exit_info->exception.syndrome, ipa = exit_info->exception.physical_address;
         uint32_t ec = (uint32_t)(esr >> 26);
-        if (ec == 0x01) { stop = "parked"; status = 0; break; } /* WFI/WFE */
+        if (ec == 0x01) {
+            if (!have_gic) { stop = "parked"; status = 0; break; } /* WFI/WFE */
+            hv_vcpu_set_reg(vcpu, HV_REG_PC, pc + 4);
+            continue;
+        }
+        if (ec == 0x18 && have_gic) {
+            /* Trapped system register (the hypervisor traps debug registers such
+             * as OSDLR_EL1/OSLAR_EL1): there is no debugger, so writes are
+             * ignored and reads return 0. Only enabled for Linux-style guests. */
+            unsigned rt = (esr >> 5) & 31, read = esr & 1;
+            if (read && rt != 31) hv_vcpu_set_reg(vcpu, (hv_reg_t)(HV_REG_X0 + rt), 0);
+            sysreg_traps++;
+            hv_vcpu_set_reg(vcpu, HV_REG_PC, pc + 4);
+            continue;
+        }
+        if (have_gic && (ec == 0x16 || ec == 0x17)) { /* PSCI via HVC or SMC */
+            uint64_t fn = 0, arg = 0, ret = (uint64_t)-1; /* NOT_SUPPORTED */
+            hv_vcpu_get_reg(vcpu, HV_REG_X0, &fn);
+            hv_vcpu_get_reg(vcpu, HV_REG_X1, &arg);
+            if (++psci_calls > 100000) { stop = "fault"; snprintf(fault, sizeof fault, " PSCI call storm"); break; }
+            fn &= 0xffffffffULL;
+            if (fn == 0x84000000) ret = 0x10000;                 /* PSCI_VERSION: 1.0 */
+            else if (fn == 0x8400000a && ((arg & 0xffffffffULL) == 0x84000000 ||
+                                          (arg & 0xffffffffULL) == 0x84000008 ||
+                                          (arg & 0xffffffffULL) == 0x84000009)) ret = 0;
+            else if (fn == 0x84000008) { stop = "poweroff"; status = 0; break; }
+            else if (fn == 0x84000009) { stop = "reset"; status = 0; break; }
+            hv_vcpu_set_reg(vcpu, HV_REG_X0, ret);
+            if (ec == 0x17) hv_vcpu_set_reg(vcpu, HV_REG_PC, pc + 4); /* SMC traps before retiring */
+            continue;
+        }
         if (ec == 0x24 && have_uart && (esr & (1U << 24)) && ipa - uart < 0x1000) {
             unsigned srt = (esr >> 16) & 31, write = (esr >> 6) & 1;
             uint64_t off = ipa - uart, value = 0;
@@ -214,13 +282,16 @@ int main(int argc, char **argv) {
                 if (srt != 31) hv_vcpu_get_reg(vcpu, (hv_reg_t)(HV_REG_X0 + srt), &value);
                 if (off == 0) {
                     putchar((int)(value & 0xff));
+                    if ((value & 0xff) == '\n') fflush(stdout);
                     tail[0] = tail[1];
-                    tail[1] = (char)value;
+                    tail[1] = tail[2];
+                    tail[2] = (char)value;
                 }
             } else {
                 int more = in_pos < in_len;
                 if (off == 0x18) {
-                    if (!more && tail[0] == '>' && tail[1] == ' ') { stop = "idle"; status = 0; break; }
+                    /* Idle: input consumed and the prompt "> " begins a line. */
+                    if (!more && tail[0] == '\n' && tail[1] == '>' && tail[2] == ' ') { stop = "idle"; status = 0; break; }
                     value = more ? 0 : 0x10; /* FR.RXFE when empty */
                 } else if (off == 0) {
                     value = more ? (unsigned char)input[in_pos++] : 0;
@@ -250,6 +321,9 @@ int main(int argc, char **argv) {
         if (!f || fwrite(src, 1, dumps[i].size, f) != dumps[i].size) return fail("dump failed", dumps[i].file);
         fclose(f);
     }
+    if (have_gic)
+        fprintf(stderr, "[psci calls: %llu, trapped sysreg accesses: %llu]\n",
+                (unsigned long long)psci_calls, (unsigned long long)sysreg_traps);
     fprintf(stderr, "[stop: %s%s]\n", stop, fault);
     return status;
 }

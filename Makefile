@@ -20,12 +20,12 @@ ifeq ($(wildcard $(PLATFORM_DIR)/platform.c),)
 $(error Unknown PLATFORM '$(PLATFORM)'; available: $(notdir $(patsubst %/,%,$(dir $(wildcard platform/*/platform.c)))))
 endif
 
-.PHONY: all probe screen-probe hw-kit font host hvf-test upstream-dt test run console clean
+.PHONY: all probe screen-probe hw-kit font host hvf-test linux-vm-test upstream-dt test run console clean
 all: build/monitor.bin build/entry-probe.bin build/screen-probe.bin
 
 probe: build/entry-probe.bin
 
-MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c src/linux_boot.c src/fdt.c $(PLATFORM_DIR)/platform.c
+MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c src/linux_boot.c src/linux_jump.S src/fdt.c $(PLATFORM_DIR)/platform.c
 MONITOR_HDR = src/exception.h src/fdt.h src/framebuffer.h src/font.h src/linux_boot.h src/monitor.h src/platform.h
 
 build/monitor.elf: $(MONITOR_SRC) $(MONITOR_HDR) $(PLATFORM_DIR)/link.ld
@@ -101,9 +101,15 @@ $(HVF_RUN): tools/hvf_run.c tools/hvf_run.entitlements
 ifeq ($(UNAME_S)-$(UNAME_M),Darwin-arm64)
 hvf-test: all $(HVF_RUN)
 	$(PYTHON) tests/hvf_test.py
+	$(PYTHON) tests/hvf_linux_test.py
+
+# Boot a real Linux kernel through the monitor's loader (fetches inputs once).
+linux-vm-test: all $(HVF_RUN)
+	$(PYTHON) tools/vm/prepare_linux_test.py
+	$(PYTHON) tests/hvf_linux_test.py
 else
-hvf-test:
-	@echo "SKIP: hvf-test needs macOS on Apple Silicon"
+hvf-test linux-vm-test:
+	@echo "SKIP: $@ needs macOS on Apple Silicon"
 endif
 
 # Regenerate the bitmap font header after editing tools/font8x16.txt.

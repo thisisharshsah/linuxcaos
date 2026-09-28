@@ -216,6 +216,21 @@ Nothing was tested on hardware.
   49,028 bytes, no warnings. `/chosen/framebuffer@0` is `disabled` with
   `reg = <0 0 0 0>`; `/memory@800000000` has `reg = <0x8 0x0 0x2 0x0>`.
 
+## 2026-09-28 — Real Linux in a Hypervisor.framework VM (this Mac)
+
+- macOS 27.0 (26A428) on MacBookPro17,1: `hv_gic_get_*` reports a 64 KB
+  distributor (64 KB alignment), 128 KB redistributor per vCPU, a 32 MB
+  redistributor region, and SPIs 32–1019.
+- Debian 13 installer kernel (Linux 6.12.107+deb13-arm64, SHA-256 `9c37ace5…`,
+  uncompressed Image, 4K pages, image_size 0x24f0000) booted through the
+  monitor's `boot` command. The kernel reported MIDR `0x610f0000` (implementer
+  0x61, Apple).
+- Observed guest behaviour: 7 PSCI calls over HVC (no PC adjustment needed for
+  HVC); 2 trapped writes to `OSDLR_EL1`-class debug registers (ESR EC 0x18),
+  which the runner ignores; userspace reached about 0.1 s after kernel start.
+- This is EL1 in a VM with a generic kernel. It shows nothing about iBoot's entry
+  state, EL2, 16K pages, or Apple devices.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

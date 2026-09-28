@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "exception.h"
+#include "fdt.h"
 #include "framebuffer.h"
 #include "linux_boot.h"
 #include "monitor.h"
@@ -417,9 +418,98 @@ static void cmd_kimage(const char *args) {
     puts_serial("\n");
 }
 
+void linux_jump(uint64_t dtb, uint64_t entry) __attribute__((noreturn));
+
+/* Aligned 8-byte copy, overlap-safe; volatile keeps it from becoming a memmove call. */
+static void copy_words(uint64_t dst, uint64_t src, uint64_t bytes) {
+    volatile uint64_t *d = (volatile uint64_t *)(uintptr_t)dst;
+    const volatile uint64_t *s = (const volatile uint64_t *)(uintptr_t)src;
+    uint64_t n = (bytes + 7) / 8;
+    if (dst < src) for (uint64_t i = 0; i < n; i++) d[i] = s[i];
+    else for (uint64_t i = n; i > 0; i--) d[i - 1] = s[i - 1];
+}
+
+static uint64_t be64_at(const uint8_t *p) {
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) v = (v << 8) | p[i];
+    return v;
+}
+
+static int overlaps(uint64_t a, uint64_t alen, uint64_t b, uint64_t blen) {
+    return a < b + blen && b < a + alen;
+}
+
+/*
+ * boot <image> <image_bytes> <dtb> <initrd> <initrd_bytes>, all hex: take a
+ * staged Linux Image, DTB, and initramfs, place them with linux_boot_plan
+ * inside the DTB's memory above this monitor, record the initrd in the DTB,
+ * and enter Linux. Staged copies must lie above the planned layout.
+ */
+static void cmd_boot(const char *args) {
+    uint64_t image, image_bytes, dtb, initrd, initrd_bytes;
+    if (!parse_hex(&args, &image) || !parse_hex(&args, &image_bytes) || !parse_hex(&args, &dtb) ||
+        !parse_hex(&args, &initrd) || !parse_hex(&args, &initrd_bytes)) {
+        puts_serial("Usage: boot <image> <image_bytes> <dtb> <initrd> <initrd_bytes> (hex)\n");
+        return;
+    }
+    if ((image | dtb | initrd) & 7) { puts_serial("Error: addresses must be 8-byte aligned\n"); return; }
+    struct linux_image_info info;
+    if (linux_image_parse((const uint8_t *)(uintptr_t)image, LINUX_IMAGE_HEADER_SIZE, image_bytes, &info)) {
+        puts_serial("Error: not a usable Linux Image (see kimage)\n");
+        return;
+    }
+    struct fdt staged;
+    if (fdt_open(&staged, (uint8_t *)(uintptr_t)dtb, (uint32_t)LINUX_DTB_MAX) != FDT_OK) {
+        puts_serial("Error: invalid device tree\n");
+        return;
+    }
+    const uint8_t *reg;
+    uint32_t reg_len;
+    int mem = fdt_find(&staged, "/memory");
+    if (mem < 0 || fdt_get_prop(&staged, mem, "reg", &reg, &reg_len) != FDT_OK || reg_len != 16) {
+        puts_serial("Error: device tree needs /memory reg with 2 address and 2 size cells\n");
+        return;
+    }
+    uint64_t ram_base = be64_at(reg), ram_end = ram_base + be64_at(reg + 8);
+    uint64_t low = (uint64_t)(uintptr_t)__stack_top;
+    if (low < ram_base) low = ram_base;
+    uint32_t dtb_bytes = fdt_total_size(&staged);
+    struct linux_boot_plan plan;
+    if (linux_boot_plan(&info, low, ram_end - low, dtb_bytes + 0x1000, initrd_bytes, &plan)) {
+        puts_serial("Error: kernel, DTB, and initrd do not fit in RAM\n");
+        return;
+    }
+    uint64_t span = plan.initrd_end - plan.image_base;
+    if (overlaps(image, image_bytes, plan.image_base, span) || overlaps(dtb, dtb_bytes, plan.image_base, span) ||
+        overlaps(initrd, initrd_bytes, plan.image_base, span)) {
+        puts_serial("Error: staged files overlap the planned layout; stage them higher\n");
+        return;
+    }
+    copy_words(plan.kernel, image, image_bytes);
+    copy_words(plan.dtb, dtb, dtb_bytes);
+    copy_words(plan.initrd, initrd, initrd_bytes);
+    struct fdt tree;
+    struct fdt_linux_params params = {0};
+    params.initrd_start = plan.initrd;
+    params.initrd_end = plan.initrd_end;
+    if (fdt_open(&tree, (uint8_t *)(uintptr_t)plan.dtb, (uint32_t)(dtb_bytes + 0x1000)) != FDT_OK ||
+        fdt_fill_linux(&tree, &params) != FDT_OK) {
+        puts_serial("Error: could not update the device tree\n");
+        return;
+    }
+    puts_serial("kernel 0x");
+    put_hex64(plan.kernel);
+    puts_serial("  dtb 0x");
+    put_hex64(plan.dtb);
+    puts_serial("  initrd 0x");
+    put_hex64(plan.initrd);
+    puts_serial("\nEntering Linux.\n");
+    linux_jump(plan.dtb, plan.kernel);
+}
+
 static void dispatch(void) {
     if (cmd_match(line, "help")) {
-        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  kimage  fb  trap  clear\n");
+        puts_serial("help  info  status  echo  dump  peek  poke  regs  probe  kimage  boot  fb  trap  clear\n");
     } else if (cmd_match(line, "info")) {
         puts_serial("ARM64 / ");
         puts_serial(platform_name());
@@ -441,6 +531,8 @@ static void dispatch(void) {
         cmd_regs();
     } else if (cmd_match(line, "probe")) {
         cmd_probe(line + 5);
+    } else if (cmd_match(line, "boot")) {
+        cmd_boot(line + 4);
     } else if (cmd_match(line, "kimage")) {
         cmd_kimage(line + 6);
     } else if (cmd_match(line, "trap")) {
