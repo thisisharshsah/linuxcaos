@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LIB_PATH = ROOT / "build/host/liblinux_boot.so"
+LIB_PATH = ROOT / "build/host/libportable.so"
 MAGIC = 0x644D5241
 MB2, GB = 0x200000, 0x40000000
 

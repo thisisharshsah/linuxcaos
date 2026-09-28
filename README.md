@@ -39,6 +39,10 @@ commands, CRLF handling, editing, and overlong-input recovery. Framebuffer tests
 map test RAM, attach the text console to it, and compare every pixel with an
 independent Python rendering; `build/fb-test.png` is the resulting snapshot.
 
+`make screen-probe` builds the M1 screen probe, the first payload designed for
+the physical Mac: it reports entry state and `boot_args` on the display. It has
+not been run on hardware; see [the design and owner procedure](docs/SCREEN_PROBE.md).
+
 `make probe` builds a separate, relocatable entry-state probe. It records incoming
 registers into its own memory and parks; it has no physical output channel yet.
 `make test` also runs the host tool tests and synthetic probe execution checks.
@@ -75,6 +79,8 @@ rewrite. Record each specification, observation, and source explicitly.
 - `src/framebuffer.c`: platform-neutral 32-bpp text console (glyphs, wrap, scroll).
 - `tools/font8x16.txt`, `tools/generate_font.py`: editable font source and `src/font.h` generator (`make font`).
 - `tools/fb_export.py`: converts a saved framebuffer dump to PNG/PPM.
+- `src/screen_probe_entry.S`, `src/screen_probe.c`: M1 screen probe (position-independent raw payload).
+- `src/bootargs.c`: portable candidate `boot_args` parsing and framebuffer validation.
 - `src/entry_probe.S`: stack-free, PC-relative entry-state capture experiment.
 - `tools/inspect_probe.py`: offline saved-record decoder; JSON output.
 - `tools/inspect_bootargs.py`: offline decoder for a saved candidate Apple `boot_args` capture.

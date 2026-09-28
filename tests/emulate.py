@@ -25,7 +25,6 @@ import sys
 
 sys.path.insert(0, str(ROOT))
 from tools.fb_export import export
-from tools.generate_font import parse_font
 
 FB = 0x40200000
 FB_SIZE = 0x100000
@@ -166,70 +165,15 @@ run_case(
 (ROOT / "build/serial-test.log").write_text(transcript)
 
 # --- Framebuffer console: compare emulator memory with an independent model. ---
-GLYPHS = parse_font((ROOT / "tools/font8x16.txt").read_text(encoding="ascii"))
+from tests.fbmodel import encode, model_cells, render_cells  # noqa: E402
+
 FG_RGB, BG_RGB = 0x00E0E0E0, 0x00102040
 
 
-def encode(rgb, pixel):
-    """Independent restatement of the pixel formats (Linux simplefb layouts)."""
-    if pixel == "x8r8g8b8":
-        return rgb
-    r, g, b = (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF
-    ten = lambda c: round(c * 1023 / 255)  # full-scale mapping: 0xff -> 0x3ff
-    return (ten(r) << 20) | (ten(g) << 10) | ten(b)
-
-
-def model_cells(stream, cols, rows):
-    """Reference console: the character grid the byte stream should leave."""
-    # `clear` sends this sequence to serial only and erases the framebuffer.
-    stream = stream.rsplit(b"\x1b[2J\x1b[H", 1)[-1]
-    grid = [[" "] * cols for _ in range(rows)]
-    col = row = 0
-
-    def newline():
-        nonlocal col, row
-        col = 0
-        if row + 1 < rows:
-            row += 1
-        else:
-            grid.pop(0)
-            grid.append([" "] * cols)
-
-    for ch in stream.decode("ascii"):
-        if ch == "\n":
-            newline()
-        elif ch == "\r":
-            col = 0
-        elif ch == "\b":
-            col = max(col - 1, 0)
-        elif " " <= ch <= "~":
-            if col == cols:
-                newline()
-            grid[row][col] = ch
-            col += 1
-    return ["".join(r) for r in grid]
-
-
 def expected_pixels(cells, width, height, scale, pixel="x8r8g8b8"):
-    """Words per pixel row; the region below the last full text row stays dirty."""
-    dirty = 0x5A5A5A5A
-    FG, BG = encode(FG_RGB, pixel), encode(BG_RGB, pixel)
-    out = []
-    for y in range(height):
-        text_row, gy = divmod(y // scale, 16)
-        if text_row >= len(cells):
-            out.append([BG] * width)  # cleared on attach, never drawn or scrolled
-            continue
-        row = []
-        for x in range(width):
-            cell, gx = divmod(x // scale, 8)
-            if cell >= len(cells[text_row]):
-                row.append(BG)
-            else:
-                bits = GLYPHS[ord(cells[text_row][cell])][gy]
-                row.append(FG if bits & (0x80 >> gx) else BG)
-        out.append(row)
-    return out, dirty
+    """Words per pixel row, plus the dirty fill value for untouched memory."""
+    return render_cells(cells, width, height, scale, encode(FG_RGB, pixel),
+                        encode(BG_RGB, pixel)), 0x5A5A5A5A
 
 
 def fb_case(width, height, stride, scale, commands, expect_lines, png=None, pixel="x8r8g8b8"):
@@ -265,6 +209,8 @@ fb_case(320, 64, 1344, 1, "echo Hello M1\nhelx\bp\nfb\n",
         # The 62-character status line wraps at column 40.
         ["> fb", "fb: 0x0000000040200000 320x64 stride 134", "4 scale 1 x8r8g8b8 (40x4 cell"],
         png="build/fb-test.png")
+# Backspace stays visible on a taller screen: "helx<BS>p" must read "help".
+fb_case(320, 160, 1280, 1, "echo 1\nhelx\bp\n", ["> help", "help  info  status"])
 # Scale 2 with a height that leaves a partial row, forcing repeated scrolls.
 fb_case(320, 80, 1280, 2, "echo abcdefghijklmnopqrstuvwxyz0123456789\n",
         ["uvwxyz0123456789", ">"])

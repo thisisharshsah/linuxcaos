@@ -131,6 +131,16 @@ about Apple hardware, not observations on this Mac.
   be reused and validated, not rewritten.
 - Still unverified by us: every item above on this Mac and firmware.
 
+## 2026-09-27 — Project constraint and build-tool observation
+
+- Constraint: the owner has one Mac (the MacBookPro17,1 development host) and
+  no second machine or debug cable, so the first hardware output path is the
+  display. See [SCREEN_PROBE.md](SCREEN_PROBE.md).
+- Tool observation: this host's `make` is GNU Make 3.81. During mutation
+  testing, restoring a file within the same second as a build left stale
+  outputs that make treated as current, which produced misleading results.
+  Mutation and comparison runs therefore rebuild from an empty `build/`.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

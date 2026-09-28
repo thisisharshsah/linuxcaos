@@ -17,6 +17,9 @@ are recorded in [APPLE_BOOT.md](APPLE_BOOT.md). A separate original
 harness now exist. These are preparation for physical testing, not completion
 of M1. See the [blueprint](BLUEPRINT.md) for current validation evidence.
 
+The owner has one Mac and no debug cable, so the first experiment is the
+[screen probe](SCREEN_PROBE.md): it reports entry state on the display.
+
 Asahi documentation (a secondary source) reports EL2 entry with the MMU off and
 `x0` = `boot_args`; the probe should confirm this. Asahi develops on hardware,
 not emulators: code is sent over USB-C from a second computer, and a second
