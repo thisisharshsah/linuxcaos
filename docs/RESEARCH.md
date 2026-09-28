@@ -141,6 +141,22 @@ about Apple hardware, not observations on this Mac.
   outputs that make treated as current, which produced misleading results.
   Mutation and comparison runs therefore rebuild from an empty `build/`.
 
+## 2026-09-27 — Real-core observations (Hypervisor.framework, this Mac)
+
+- Method: `tools/hvf_run.c` on macOS 27.0 (26A428), MacBookPro17,1; guest at
+  EL1, MMU off, memory map chosen by the runner. Not an M1 boot environment.
+- Observed: FP/SIMD instructions trap in the guest (ESR EC 0x07) until enabled;
+  Unicorn 2.1.4 executes them without trapping. With the pinned Zig 0.14.1,
+  `-mcpu=cortex_a57 -mgeneral-regs-only` still produced SIMD code (`fmov`,
+  `mov v0.h[n]`, `xtn`); `-mcpu=cortex_a57-neon-fp_armv8 -mno-implicit-float`
+  produced none.
+- Observed: a guest `wfe; b` loop did not exit to the host, so park detection
+  needs a watchdog (`hv_vcpus_exit`).
+- Observed: BRK with debug-exception trapping disabled entered the guest's own
+  EL1 vectors, with ESR and ELR as architecturally expected.
+- Relevance to M1 boot: the firmware may also leave FP/SIMD disabled at our entry;
+  keeping boot images free of FP/SIMD avoids depending on it.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

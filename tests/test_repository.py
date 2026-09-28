@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TAG = "SPDX-License-Identifier: GPL-2.0-or-later"
 SOURCE_GLOBS = ("src/*.[chS]", "platform/**/*.c", "platform/**/*.ld",
-                "tools/*.py", "tools/*.txt", "tests/*.py", "Makefile")
+                "tools/*.py", "tools/*.c", "tools/*.txt", "tests/*.py", "Makefile")
 
 
 def source_files():

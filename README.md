@@ -49,6 +49,11 @@ registers into its own memory and parks; it has no physical output channel yet.
 See [the probe design](docs/ENTRY_PROBE.md) and
 [primary-source Apple boot research](docs/APPLE_BOOT.md).
 
+On a Mac with Apple Silicon, `make test` also runs `make hvf-test`: the monitor
+and screen probe run on the real CPU cores in a small Hypervisor.framework VM
+(EL1, MMU off). This catches bugs Unicorn cannot, such as trapped FP/SIMD
+instructions. It is not an M1 boot: no EL2, iBoot, or Apple devices.
+
 With QEMU installed separately, `make run` launches the actual virt device model.
 Alternatively, `make console` launches the interactive serial monitor directly in your terminal using Unicorn without requiring QEMU.
 Commands include `help`, `info`, `status`, `echo`, `dump`, `peek`, `poke`, `regs`, `probe`, `kimage`, `fb`, `trap`, or `clear`; press `Ctrl-]` to exit the console runner.
@@ -87,6 +92,8 @@ rewrite. Record each specification, observation, and source explicitly.
 - `src/linux_boot.c`: portable Linux Image header check and kernel/DTB/initrd placement
   per the kernel's arm64 boot rules; `make host` builds it for host tests.
 - `tools/fdt.py`: build or dump flattened device tree (DTB) files.
+- `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
+- `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
 - `tests/emulate_probe.py`: synthetic relocation and register-capture tests.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.

@@ -60,8 +60,13 @@ right: `x2r10g10b10` for depth 30 is inferred from documentation, not measured.
   past `boot_args`, swapped EL/DAIF record, use of the firmware stack, and an
   accepted misaligned framebuffer were each caught.
 
-Limits: Unicorn runs at EL1 without an MMU or cache model, and the inputs are
-invented. It cannot show what the real firmware passes or how it maps memory.
+`make hvf-test` also runs the same image on this Mac's real CPU cores at EL1 with
+the MMU off, inside a Hypervisor.framework VM, at three load addresses; every
+framebuffer pixel must match. This exercises real instruction behaviour,
+including traps for FP/SIMD and Device-memory alignment.
+
+Limits: neither harness runs at EL2 or under iBoot, and the inputs are invented.
+They cannot show what the real firmware passes or how it maps memory.
 
 ## Hardware procedure (owner decision; not yet validated)
 

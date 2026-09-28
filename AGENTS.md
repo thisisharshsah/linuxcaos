@@ -8,7 +8,8 @@ architecture/status rows, evidence, next steps, revision/date, and append its
 history entry in the same change. Update `docs/ROADMAP.md` when milestone scope
 changes and `docs/RESEARCH.md` for new hardware observations or sourced findings.
 
-Distinguish source written, build passed, Unicorn instruction tests, QEMU
+Distinguish source written, build passed, Unicorn instruction tests, real-core
+Hypervisor.framework tests (EL1 in a VM we define, not an M1 boot), QEMU
 device-model tests, and physical-M1 validation. Never promote emulator results
 to hardware compatibility or describe planned components as implemented.
 

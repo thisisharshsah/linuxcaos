@@ -35,7 +35,8 @@ on Linux and macOS.
   the kernel. Record what you relied on in [docs/RESEARCH.md](docs/RESEARCH.md)
   with links.
 - **Say exactly what you proved.** Use the blueprint's evidence levels: build
-  passed, host tests, Unicorn instruction tests, QEMU device tests, or
+  passed, host tests, Unicorn instruction tests, real-core tests
+  (`make hvf-test`, EL1 in a Hypervisor.framework VM), QEMU device tests, or
   physical-M1 validation. Never describe emulator success as hardware support,
   or planned work as implemented.
 - **Keep the blueprint current.** For meaningful changes, update the affected

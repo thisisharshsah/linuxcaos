@@ -105,17 +105,11 @@ def check_accesses(accesses, base, args_at, fb_base, fb_size):
         assert addr % size == 0, f"unaligned {kind} at {addr:#x} (Device memory would fault)"
 
 
-def case(base, width, height, stride, depth, png=None, daif=0x3C0):
-    fb_base, args_at = 0x9E0000000, 0x812300040
-    fb_size = (stride * height + 0xFFF) & ~0xFFF
-    args = make_bootargs(fb_base, width, height, stride, depth)
-    cpu, accesses, state = run(base, args_at, args, fb_base, fb_size, daif=daif)
-    check_accesses(accesses, base, args_at, fb_base, fb_size)
-
+def check_screen(mem, width, height, stride, depth, state, args, png=None):
+    """Compare a framebuffer dump with the expected bars and report, pixel for pixel."""
     pixel = {30: "x2r10g10b10", 32: "x8r8g8b8"}[depth & 0xFF]
     scale = 2 if width >= 1600 else 1
     bar = height // 16
-    mem = bytes(cpu.mem_read(fb_base, stride * height))
     colors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFFFF]
     for y in range(bar):
         row = struct.unpack_from(f"<{width}I", mem, y * stride)
@@ -134,6 +128,16 @@ def case(base, width, height, stride, depth, png=None, daif=0x3C0):
         (ROOT / png).write_bytes(export(mem, width, height, stride, "png", pixel=pixel))
 
 
+def case(base, width, height, stride, depth, png=None, daif=0x3C0):
+    fb_base, args_at = 0x9E0000000, 0x812300040
+    fb_size = (stride * height + 0xFFF) & ~0xFFF
+    args = make_bootargs(fb_base, width, height, stride, depth)
+    cpu, accesses, state = run(base, args_at, args, fb_base, fb_size, daif=daif)
+    check_accesses(accesses, base, args_at, fb_base, fb_size)
+    mem = bytes(cpu.mem_read(fb_base, stride * height))
+    check_screen(mem, width, height, stride, depth, state, args, png)
+
+
 def untouched(base, args, x0=None):
     fb_base, args_at, fb_size = 0x9E0000000, 0x812300040, 0x100000
     cpu, accesses, _ = run(base, args_at, args, fb_base, fb_size, x0=x0)
@@ -141,21 +145,26 @@ def untouched(base, args, x0=None):
     assert bytes(cpu.mem_read(fb_base, fb_size)) == bytes([DIRTY]) * fb_size, "drew despite bad input"
 
 
-# The same bytes at three load addresses, including one that is only page aligned.
-case(0x40000000, 800, 480, 3264, 0x00020000 | 30, png="build/screen-probe-test.png")
-case(0x812344000, 640, 400, 2560, 32, daif=0)
-case(0x1000000000, 1600, 208, 6400 + 128, 30)
+def main():
+    # The same bytes at three load addresses, including one that is only page aligned.
+    case(0x40000000, 800, 480, 3264, 0x00020000 | 30, png="build/screen-probe-test.png")
+    case(0x812344000, 640, 400, 2560, 32, daif=0)
+    case(0x1000000000, 1600, 208, 6400 + 128, 30)
 
-# Bad input: no drawing at all, and still no stray memory accesses.
-good = make_bootargs(0x9E0000000, 320, 64, 1280, 30)
-untouched(0x40000000, good, x0=0)
-untouched(0x40000000, good, x0=0x812300044)  # misaligned x0
-untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 30, Revision=3))
-untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 24))
-untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1000, 30))  # stride < width * 4
-untouched(0x40000000, make_bootargs(0x9E0000002, 320, 64, 1280, 30))  # misaligned framebuffer
-untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 30, memSize=0))
+    # Bad input: no drawing at all, and still no stray memory accesses.
+    good = make_bootargs(0x9E0000000, 320, 64, 1280, 30)
+    untouched(0x40000000, good, x0=0)
+    untouched(0x40000000, good, x0=0x812300044)  # misaligned x0
+    untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 30, Revision=3))
+    untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 24))
+    untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1000, 30))  # stride < width * 4
+    untouched(0x40000000, make_bootargs(0x9E0000002, 320, 64, 1280, 30))  # misaligned framebuffer
+    untouched(0x40000000, make_bootargs(0x9E0000000, 320, 64, 1280, 30, memSize=0))
 
-print("PASS: screen probe at three load addresses, entry-state and boot_args report, "
-      "colour bars, x8r8g8b8/x2r10g10b10, scale 1-2, bounded memory accesses, "
-      "rejection of invalid boot_args")
+    print("PASS: screen probe at three load addresses, entry-state and boot_args report, "
+          "colour bars, x8r8g8b8/x2r10g10b10, scale 1-2, bounded memory accesses, "
+          "rejection of invalid boot_args")
+
+
+if __name__ == "__main__":
+    main()
