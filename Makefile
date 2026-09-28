@@ -25,8 +25,8 @@ all: build/monitor.bin build/entry-probe.bin build/screen-probe.bin
 
 probe: build/entry-probe.bin
 
-MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c src/linux_boot.c $(PLATFORM_DIR)/platform.c
-MONITOR_HDR = src/exception.h src/framebuffer.h src/font.h src/linux_boot.h src/monitor.h src/platform.h
+MONITOR_SRC = src/start.S src/vectors.S src/monitor.c src/exception.c src/framebuffer.c src/linux_boot.c src/fdt.c $(PLATFORM_DIR)/platform.c
+MONITOR_HDR = src/exception.h src/fdt.h src/framebuffer.h src/font.h src/linux_boot.h src/monitor.h src/platform.h
 
 build/monitor.elf: $(MONITOR_SRC) $(MONITOR_HDR) $(PLATFORM_DIR)/link.ld
 	mkdir -p build
@@ -74,10 +74,10 @@ hw-kit: build/screen-probe.bin
 
 # Portable modules also built for the host, so tests exercise the same C code.
 HOST_LIB = build/host/libportable.so
-HOST_SRC = src/linux_boot.c src/bootargs.c src/framebuffer.c
+HOST_SRC = src/linux_boot.c src/bootargs.c src/framebuffer.c src/fdt.c
 host: $(HOST_LIB)
 
-$(HOST_LIB): $(HOST_SRC) src/linux_boot.h src/bootargs.h src/framebuffer.h src/font.h
+$(HOST_LIB): $(HOST_SRC) src/linux_boot.h src/bootargs.h src/framebuffer.h src/font.h src/fdt.h
 	mkdir -p build/host
 	$(ZIG) cc -shared -fPIC -O2 -Wall -Wextra -Werror -Isrc -o $@ $(HOST_SRC)
 

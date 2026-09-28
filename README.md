@@ -96,6 +96,7 @@ rewrite. Record each specification, observation, and source explicitly.
 - `src/linux_boot.c`: portable Linux Image header check and kernel/DTB/initrd placement
   per the kernel's arm64 boot rules; `make host` builds it for host tests.
 - `tools/fdt.py`: build or dump flattened device tree (DTB) files.
+- `src/fdt.c`: freestanding DTB editor and Linux device-tree fill-in for the loader.
 - `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
 - `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
 - `tools/make_hw_kit.py`: assembles the owner's hardware-run kit (`make hw-kit`).
