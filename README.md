@@ -97,6 +97,7 @@ rewrite. Record each specification, observation, and source explicitly.
   per the kernel's arm64 boot rules; `make host` builds it for host tests.
 - `tools/fdt.py`: build or dump flattened device tree (DTB) files.
 - `src/fdt.c`: freestanding DTB editor and Linux device-tree fill-in for the loader.
+- `tools/fetch_upstream_dt.py`: `make upstream-dt` fetches and builds the real mainline MacBookPro17,1 DTB (pinned, checksummed) for tests.
 - `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
 - `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
 - `tools/make_hw_kit.py`: assembles the owner's hardware-run kit (`make hw-kit`).

@@ -205,6 +205,17 @@ Nothing was tested on hardware.
   "Removing any Preboot and Recovery Directories", and finished; Preboot and
   Recovery afterwards list only Macintosh HD's `5FEC2332…` folder.
 
+## 2026-09-28 — Real upstream device tree for MacBookPro17,1
+
+- Source: Linux v7.2 tag, commit `8d3ae59288f1e7d58d76558a6ee96d533bc5019f`;
+  `t8103-j293.dts` includes `t8103.dtsi`, `t8103-jxxx.dtsi`, `t8103-pmgr.dtsi`,
+  `spi1-nvram.dtsi`, and seven `dt-bindings` headers (12 files, SHA-256 values in
+  `tools/fetch_upstream_dt.py`). `t8103-jxxx.dtsi` is unchanged from the copy
+  read during the 2026-09-27 research.
+- Compiled with dtc 1.8.1 (tarball SHA-256 `74b50bb1…`) after C preprocessing:
+  49,028 bytes, no warnings. `/chosen/framebuffer@0` is `disabled` with
+  `reg = <0 0 0 0>`; `/memory@800000000` has `reg = <0x8 0x0 0x2 0x0>`.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,
