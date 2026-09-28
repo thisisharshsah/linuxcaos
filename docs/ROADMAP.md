@@ -72,7 +72,9 @@ repeatable boot logs. Emulator success alone does not satisfy this milestone.
 
 Mainline Linux already contains a MacBookPro17,1 device tree and drivers for the
 interrupt controller, UART, NVMe, PCIe, USB, IOMMU, SMC, and more (see
-[RESEARCH.md](RESEARCH.md)). First reuse and validate that support on the target;
+[RESEARCH.md](RESEARCH.md)). Asahi documents the GPU, keyboard, trackpad,
+audio, camera, and sleep on this model as downstream-only, so those are the
+main gaps for a usable desktop. First reuse and validate that support on the target;
 develop independently only what is missing or broken, and track provenance and
 licensing of any kernel patches. Firmware-mediated devices and the GPU remain
 substantial projects.
@@ -84,3 +86,10 @@ Exit criterion: published per-device support matrix backed by hardware tests.
 Only after reliable boot and storage: reproducible Linux builds, package
 integration, updates, an installer, and a tested recovery path. Full parity
 with macOS is not promised.
+
+Proposed direction (research only, see [DISTRIBUTION_RESEARCH.md](DISTRIBUTION_RESEARCH.md)):
+reuse Fedora's aarch64 packages, own a small signed overlay and one signed
+image-based OS build with health-checked rollback, deliver apps through
+Flathub, and grow `tools/probeos.sh` into the installer, repair tool, and
+uninstaller. The project's own boot stage needs its own fallback path, because
+no existing rollback scheme covers it.

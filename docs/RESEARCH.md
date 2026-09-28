@@ -184,6 +184,16 @@ about Apple hardware, not observations on this Mac.
 - `softwareupdate --list-full-installers` offered macOS 27.0 (26A428) at
   17,969,056 KiB (about 18.4 GB).
 
+## 2026-09-27 — Distribution, packages, and update systems
+
+Desk research across about 90 dated sources, written up in
+[DISTRIBUTION_RESEARCH.md](DISTRIBUTION_RESEARCH.md). Findings that change this
+project's plan: several MacBookPro17,1 drivers (GPU, keyboard, trackpad, audio,
+camera, sleep) are downstream-only in Asahi's kernel; Fedora Asahi Remix uses
+Fedora RPM/DNF5 with a 16K-page kernel; aarch64 was 1.3% of Flathub downloads in
+2025; and no surveyed rollback scheme protects the Apple-specific boot stage.
+Nothing was tested on hardware.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

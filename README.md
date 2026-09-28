@@ -104,6 +104,7 @@ rewrite. Record each specification, observation, and source explicitly.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.
 - `docs/ROADMAP.md`: hardware milestones and completion criteria.
+- `docs/DISTRIBUTION_RESEARCH.md`: how existing Linux systems handle packages, apps, updates, and recovery, and the proposed approach.
 
 The monitor binary expects one CPU, MMU off, and accessible QEMU virt RAM/UART. Interrupts
 stay masked. CPU exceptions print a register report and return to the prompt
