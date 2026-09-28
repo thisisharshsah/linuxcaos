@@ -43,8 +43,9 @@ independent Python rendering; `build/fb-test.png` is the resulting snapshot.
 the physical Mac: it reports entry state and `boot_args` on the display. It has
 not been run on hardware; see [the design and owner procedure](docs/SCREEN_PROBE.md).
 
-To try it on the Mac, follow [the first hardware run checklist](docs/FIRST_HARDWARE_RUN.md);
-`make hw-kit` prepares the payload, checksum, and report template.
+To try it on the Mac, follow [the first hardware run guide](docs/FIRST_HARDWARE_RUN.md).
+`tools/probeos.sh` walks through creating a separate "ProbeOS" macOS installation,
+installing the probe from Recovery, and removing everything completely afterwards.
 
 `make probe` builds a separate, relocatable entry-state probe. It records incoming
 registers into its own memory and parks; it has no physical output channel yet.
@@ -98,6 +99,7 @@ rewrite. Record each specification, observation, and source explicitly.
 - `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
 - `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
 - `tools/make_hw_kit.py`: assembles the owner's hardware-run kit (`make hw-kit`).
+- `tools/probeos.sh`, `tools/probeos-recovery.sh`: guided setup and complete removal of ProbeOS.
 - `tests/emulate_probe.py`: synthetic relocation and register-capture tests.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.

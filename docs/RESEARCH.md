@@ -172,6 +172,18 @@ about Apple hardware, not observations on this Mac.
   macOS. This project's checklist first tries a new APFS volume in the existing
   container instead; that choice is untested for custom kernels.
 
+## 2026-09-27 — Removal behaviour of diskutil
+
+- Local help (macOS 27.0 26A428): `diskutil apfs deleteVolumeGroup <UUID>` removes
+  every volume of the group and states that "XART, Preboot, and Recovery entries
+  for the volumes are also removed", followed by a verification step.
+- This Mac's Preboot (`/System/Volumes/Preboot`) and Recovery (`/Volumes/Recovery`)
+  volumes hold one folder per volume group UUID (currently only Macintosh HD's
+  `5FEC2332-…`), without restricted file flags. `tools/probeos.sh remove` checks
+  those folders for the ProbeOS UUID afterwards as a fallback.
+- `softwareupdate --list-full-installers` offered macOS 27.0 (26A428) at
+  17,969,056 KiB (about 18.4 GB).
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

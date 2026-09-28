@@ -43,6 +43,10 @@ def make_kit(payload: Path, out: Path) -> str:
     out.mkdir(parents=True)
     (out / PAYLOAD).write_bytes(data)
     (out / "SHA256SUMS").write_text(f"{digest}  {PAYLOAD}\n")
+    # Settings for tools/probeos-recovery.sh (plain shell assignments, no spaces).
+    (out / "probeos.env").write_text(
+        f"PROBE_PAYLOAD={PAYLOAD}\nPROBE_SHA256={digest}\nPROBE_VA={LINK_ADDRESS:#x}\n")
+    shutil.copy2(ROOT / "tools" / "probeos-recovery.sh", out / "recovery.sh")
     commit = _query(["git", "rev-parse", "HEAD"]) or "unknown"
     dirty = "yes" if _query(["git", "status", "--porcelain", "--untracked-files=no"]) else "no"
     zig = _query([sys.executable, "-m", "ziglang", "version"]) or "unknown"

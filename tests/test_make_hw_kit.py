@@ -23,6 +23,10 @@ class HwKitTests(unittest.TestCase):
             self.assertIn(f"sha256: {digest}", info)
             self.assertIn(kmutil_command(), info)
             self.assertIn(digest, (out / "REPORT-TEMPLATE.md").read_text())
+            env = (out / "probeos.env").read_text()
+            self.assertIn(f"PROBE_SHA256={digest}\n", env)
+            self.assertIn("PROBE_VA=0xfffffe0007004000\n", env)
+            self.assertTrue((out / "recovery.sh").exists())
             # Rebuilding replaces the kit instead of mixing old files in.
             (out / "stale.txt").write_text("x")
             make_kit(payload, out)
