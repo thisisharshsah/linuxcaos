@@ -43,6 +43,9 @@ independent Python rendering; `build/fb-test.png` is the resulting snapshot.
 the physical Mac: it reports entry state and `boot_args` on the display. It has
 not been run on hardware; see [the design and owner procedure](docs/SCREEN_PROBE.md).
 
+To try it on the Mac, follow [the first hardware run checklist](docs/FIRST_HARDWARE_RUN.md);
+`make hw-kit` prepares the payload, checksum, and report template.
+
 `make probe` builds a separate, relocatable entry-state probe. It records incoming
 registers into its own memory and parks; it has no physical output channel yet.
 `make test` also runs the host tool tests and synthetic probe execution checks.
@@ -94,6 +97,7 @@ rewrite. Record each specification, observation, and source explicitly.
 - `tools/fdt.py`: build or dump flattened device tree (DTB) files.
 - `tools/hvf_run.c`: minimal Hypervisor.framework VM runner for real-core tests.
 - `tools/check_no_fpsimd.py`: rejects FP/SIMD instructions in boot images.
+- `tools/make_hw_kit.py`: assembles the owner's hardware-run kit (`make hw-kit`).
 - `tests/emulate_probe.py`: synthetic relocation and register-capture tests.
 - `tests/emulate.py`: ARM64 instruction execution and serial integration tests.
 - `docs/BLUEPRINT.md`: living architecture, progress, evidence, and update history.

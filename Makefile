@@ -20,7 +20,7 @@ ifeq ($(wildcard $(PLATFORM_DIR)/platform.c),)
 $(error Unknown PLATFORM '$(PLATFORM)'; available: $(notdir $(patsubst %/,%,$(dir $(wildcard platform/*/platform.c)))))
 endif
 
-.PHONY: all probe screen-probe font host hvf-test test run console clean
+.PHONY: all probe screen-probe hw-kit font host hvf-test test run console clean
 all: build/monitor.bin build/entry-probe.bin build/screen-probe.bin
 
 probe: build/entry-probe.bin
@@ -67,6 +67,10 @@ build/screen-probe.bin: build/screen-probe.elf build/screen-probe-rebased.elf to
 	$(PYTHON) tools/elf_to_binary.py --base 0 build/screen-probe.elf $@
 	$(PYTHON) tools/elf_to_binary.py --base 0x40000000 build/screen-probe-rebased.elf build/screen-probe-rebased.bin
 	cmp $@ build/screen-probe-rebased.bin || { rm -f $@; echo "screen probe is not position-independent"; exit 1; }
+
+# Everything for an owner-run screen-probe test on the Mac (docs/FIRST_HARDWARE_RUN.md).
+hw-kit: build/screen-probe.bin
+	$(PYTHON) tools/make_hw_kit.py
 
 # Portable modules also built for the host, so tests exercise the same C code.
 HOST_LIB = build/host/libportable.so

@@ -157,6 +157,21 @@ about Apple hardware, not observations on this Mac.
 - Relevance to M1 boot: the firmware may also leave FP/SIMD disabled at our entry;
   keeping boot images free of FP/SIMD avoids depending on it.
 
+## 2026-09-27 — Preparing the first hardware run
+
+- Source: pinned XNU `makedefs/MakeInc.def` line 342, `ARM64_LINK_ADDR =
+  0xfffffe0007004000` (commit `e890dd3c…`). Used as the `kmutil --raw` virtual
+  address for the screen probe; whether iBoot accepts it is untested.
+- Local tool help (read-only, macOS 27.0 26A428): `bputil -n` sets Permissive
+  Security, `-v <UUID>` selects one installation, `-f` restores Full Security,
+  `-r <UUID>` removes a policy. `kmutil configure-boot --raw` takes
+  `--lowest-virtual-address` and `--entry-point`.
+- This Mac (read-only `df`, `diskutil`, `fdesetup`, `csrutil`): 251 GB disk, one
+  APFS container, about 46 GB free, FileVault on, SIP enabled.
+- Asahi's developer quickstart creates a separate 80 GB partition for the stub
+  macOS. This project's checklist first tries a new APFS volume in the existing
+  container instead; that choice is untested for custom kernels.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,

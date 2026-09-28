@@ -68,37 +68,15 @@ including traps for FP/SIMD and Device-memory alignment.
 Limits: neither harness runs at EL2 or under iBoot, and the inputs are invented.
 They cannot show what the real firmware passes or how it maps memory.
 
-## Hardware procedure (owner decision; not yet validated)
+## Hardware procedure
 
-This changes boot security settings for a separate macOS installation. It is
-written down for review, not as a tested recipe. Back up the Mac first.
-
-1. **Separate boot target.** Custom boot policy is per macOS installation. Use a
-   second macOS installation in its own APFS container, so the everyday macOS
-   keeps Full Security. Creating one needs free disk space and a macOS
-   installer; the exact steps are still to be written and reviewed.
-2. **Build and copy.** `make screen-probe`, then copy `build/screen-probe.bin`
-   and its SHA-256 to a location readable from recoveryOS (for example, the
-   separate installation's volume).
-3. **Install from 1TR.** Shut down, hold the power button until "Loading startup
-   options…", choose Options, and open Terminal. Local `kmutil` help (macOS 27.0)
-   documents:
-
-   ```sh
-   kmutil configure-boot -c /Volumes/<Target>/screen-probe.bin --raw \
-       --lowest-virtual-address <VA> --entry-point <VA> -v /Volumes/<Target>
-   ```
-
-   The entry point is the first byte of the image, so both addresses are equal.
-   **Open question:** which virtual address to choose. Asahi describes it as
-   "mostly meaningless" for raw images; confirm before running. `kmutil` may ask
-   to lower that installation's security policy; that is expected for a custom
-   kernel and requires the owner's credentials.
-4. **Run.** Select the target installation in the boot picker. Photograph the
-   screen, including the colour bars. Record the Mac model, macOS and firmware
-   versions, the image SHA-256, and the photo in [RESEARCH.md](RESEARCH.md).
-5. **Return.** Hold the power button to turn off, then hold it again to open the
-   boot picker and choose the everyday macOS. Its security policy is unchanged.
+The owner-facing checklist is [FIRST_HARDWARE_RUN.md](FIRST_HARDWARE_RUN.md), and
+`make hw-kit` assembles the payload, its SHA-256, provenance, and a report
+template. The virtual address given to `kmutil` for both the lowest address and
+the entry point is `0xfffffe0007004000`, XNU's `ARM64_LINK_ADDR`; this is a
+reasoned choice, not a tested one. Only a separate ProbeOS installation is set
+to Permissive Security (`bputil -n -v <UUID>`); the everyday macOS keeps Full
+Security.
 
 A black screen is also a result: record it. It means `x0` was not a valid
 `boot_args`, the framebuffer description failed validation, or the probe
