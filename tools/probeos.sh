@@ -42,6 +42,7 @@ field() {  # field <diskutil-info-target> <label>: value of "label:" from diskut
 }
 
 boot_group() { field / "APFS Volume Group"; }
+boot_device() { field / "Device Identifier"; }
 probe_group() { field "$NAME" "APFS Volume Group"; }
 probe_exists() { diskutil info "$NAME" >/dev/null 2>&1; }
 
@@ -192,7 +193,15 @@ EOF
 cmd_remove() {
     say "Complete removal of $NAME. Your files on Macintosh HD are not touched."
     local group=""
-    if probe_exists; then
+    if probe_exists && [ -z "$(probe_group)" ]; then
+        # A bare volume: created, but macOS was never installed on it.
+        local dev name; dev="$(field "$NAME" "Device Identifier")"; name="$(field "$NAME" "Volume Name")"
+        [ -n "$dev" ] && [ "$name" = "$NAME" ] || die "could not identify the $NAME volume"
+        case "$(boot_device)" in "$dev"|"$dev"s*) die "$dev is the running system; refusing" ;; esac
+        say ""
+        say "1. Delete the empty $NAME volume ($dev). macOS was never installed on it."
+        run diskutil apfs deleteVolume "$dev" || die "not deleted; stopping"
+    elif probe_exists; then
         group="$(probe_group)"
         guard_not_boot "$group"
         say ""
@@ -238,13 +247,20 @@ Then open System Settings > General > Startup Disk and make sure
 Macintosh HD is selected. Delete this file when done.
 EOF
     fi
-    say ""
-    say "5. Last step, in Recovery: remove $NAME's boot policy."
-    [ -n "$group" ] && say "   Command:  bputil -r $group" && say "   (saved in $RECORD)"
-    enter_recovery_help
-    say ""
-    say "Finally check System Settings > General > Startup Disk shows Macintosh HD,"
-    say "and run: tools/probeos.sh verify-removed"
+    if [ -n "$group" ]; then
+        say ""
+        say "5. Last step, in Recovery: remove $NAME's boot policy."
+        say "   Command:  bputil -r $group"
+        say "   (saved in $RECORD)"
+        enter_recovery_help
+        say ""
+        say "Finally check System Settings > General > Startup Disk shows Macintosh HD,"
+        say "and run: tools/probeos.sh verify-removed"
+    else
+        say ""
+        say "No macOS was installed on $NAME, so it has no boot policy and nothing is"
+        say "needed in Recovery. Check with: tools/probeos.sh verify-removed"
+    fi
 }
 
 cmd_verify_removed() {

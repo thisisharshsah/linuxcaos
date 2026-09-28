@@ -24,12 +24,14 @@ FAKE_DISKUTIL = r"""#!/bin/sh
 echo "diskutil $*" >> "$STUB_LOG"
 case "$1 $2" in
   "info /")
-    printf '   Volume Name:               Macintosh HD\n   APFS Container:            disk3\n   APFS Volume Group:         %s\n' "$BOOT_GROUP" ;;
+    printf '   Device Identifier:         %s\n   Volume Name:               Macintosh HD\n   APFS Container:            disk3\n   APFS Volume Group:         %s\n' "${BOOT_DEVICE:-disk3s3s1}" "$BOOT_GROUP" ;;
   "info "*)
     [ -f "$STATE/probe_exists" ] || exit 1
-    printf '   Volume Name:               %s\n   APFS Container:            disk3\n   APFS Volume Group:         %s\n' "${FAKE_NAME:-ProbeOS}" "$PROBE_GROUP" ;;
+    printf '   Device Identifier:         %s\n   Volume Name:               %s\n   APFS Container:            disk3\n' "${PROBE_DEVICE:-disk3s7}" "${FAKE_NAME:-ProbeOS}"
+    [ -f "$STATE/probe_bare" ] || printf '   APFS Volume Group:         %s\n' "$PROBE_GROUP" ;;
   "apfs addVolume") touch "$STATE/probe_exists" ;;
   "apfs deleteVolumeGroup") rm -f "$STATE/probe_exists" ;;
+  "apfs deleteVolume") rm -f "$STATE/probe_exists" "$STATE/probe_bare" ;;
   "apfs listVolumeGroups")
     echo "+-> Volume Group $BOOT_GROUP"
     [ -f "$STATE/probe_exists" ] && echo "+-> Volume Group $PROBE_GROUP" ;;
@@ -137,6 +139,27 @@ class SetupScriptTests(unittest.TestCase):
         v = run(["bash", SETUP, "verify-removed"], self.sb.env())
         self.assertEqual(v.returncode, 0, v.stdout)
         self.assertIn("Clean on the macOS side.", v.stdout)
+
+    def test_removes_bare_volume_without_macos(self):
+        # Created by create-volume, but macOS was never installed: no volume group.
+        self.sb.probe_exists()
+        (self.sb.state / "probe_bare").touch()
+        r = run(["bash", SETUP, "remove"], self.sb.env(), "yes\n" * 10)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("diskutil apfs deleteVolume disk3s7", self.sb.calls())
+        self.assertFalse(any("deleteVolumeGroup" in c for c in self.sb.calls()))
+        self.assertIn("nothing is\nneeded in Recovery", r.stdout)
+        self.assertNotIn("bputil -r", r.stdout)
+        self.assertEqual(run(["bash", SETUP, "verify-removed"], self.sb.env()).returncode, 0)
+
+    def test_bare_volume_on_running_system_is_refused(self):
+        self.sb.probe_exists()
+        (self.sb.state / "probe_bare").touch()
+        r = run(["bash", SETUP, "remove"], self.sb.env(PROBE_DEVICE="disk3s3", BOOT_DEVICE="disk3s3s1"),
+                "yes\n" * 10)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("refusing", r.stderr)
+        self.assertFalse(any("deleteVolume" in c for c in self.sb.calls()))
 
     def test_verify_removed_reports_leftovers(self):
         self.sb.probe_exists()

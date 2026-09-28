@@ -194,6 +194,17 @@ Fedora RPM/DNF5 with a 16K-page kernel; aarch64 was 1.3% of Flathub downloads in
 2025; and no surveyed rollback scheme protects the Apple-specific boot stage.
 Nothing was tested on hardware.
 
+## 2026-09-28 — First real use of the ProbeOS tools
+
+- Real `diskutil apfs addVolume disk3 APFS ProbeOS` created `disk3s7`
+  (FileVault off, no volume group until macOS is installed).
+- `softwareupdate --fetch-full-installer --full-installer-version 27.0` started;
+  stopped by the owner before any installer app appeared. It left only a 16 KB
+  metadata folder, `/Library/Updates/142-15488`, managed by Software Update.
+- Real `diskutil apfs deleteVolume disk3s7` reported "Erasing any xART session",
+  "Removing any Preboot and Recovery Directories", and finished; Preboot and
+  Recovery afterwards list only Macintosh HD's `5FEC2332…` folder.
+
 ## Future observation template
 
 Record date, exact device and firmware, question, method, raw capture location,
